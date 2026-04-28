@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "project": "cs2sign",
+  "source": "github",
+  "build": "14156",
+  "generated_at": "2026-04-29T18:15:02Z",
+  "base_url": "https://raw.githubusercontent.com/xqzme69/cs2sign/main/signatures/",
+  "files": [
+    {
+      "name": "client_signatures.json",
+      "sha256": "7a68e9d8531cb0bc24d999aaa3d812d9e76f9fe9e11e6257a32997c0746d8566",
+      "size": 27581
+    },
+    {
+      "name": "engine2_signatures.json",
+      "sha256": "64ca43c9ff2e90673a0d5b32ecaf486ee4f7cf55a0fc2722ed3969a68583d87e",
+      "size": 63459
+    },
+    {
+      "name": "inputsystem_signatures.json",
+      "sha256": "7b4f5ca6b754686176e7c8596e6c0cd20b6c51cc422170519984ac2297ef590e",
+      "size": 7863
+    },
+    {
+      "name": "schemasystem_signatures.json",
+      "sha256": "8b6e39aa41bd445e373e4a9b4b437eb2a9b315b90978b2f22b102f071db58764",
+      "size": 9931
+    },
+    {
+      "name": "soundsystem_signatures.json",
+      "sha256": "41a9c9f4ccaa0fc51ad76115ef64ac181f8b9e64e668643a9813d27d782496a4",
+      "size": 44498
+    }
+  ]
+}

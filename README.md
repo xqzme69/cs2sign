@@ -1,0 +1,181 @@
+# cs2sign
+
+Read-only Counter-Strike 2 signature scanner and dumper.
+
+`cs2sign` opens a running `cs2.exe` process with query/read rights, loads byte-pattern signatures, scans readable memory regions, and writes matches to `cs2_signatures.json`.
+
+The repo contains the C++ scanner, the IDA signature plugin at `tools/ida/cs2_sig_dumper.py`, read-only dumpers for schemas/interfaces/known offsets, and an SDK generator.
+
+## Features
+
+- Pulls generated `*_signatures.json` files from `signatures/index.json` on GitHub.
+- Local mode loads `*_signatures.json` files next to the executable.
+- Legacy built-in signatures stay behind `--legacy-signatures`.
+- Accepts one signature JSON file or a directory path as input.
+- Supports IDA-style patterns such as `48 89 5C 24 ? 57`.
+- Filters scans by module when JSON entries include a `module` field.
+- Supports generated `address_offset` values so signatures can match inside a function but still resolve to the function start.
+- Uses `ReadProcessMemory` for target memory access.
+- Can dump Source 2 schemas, interface registries, curated known offsets, and `dump_info.json` in read-only mode.
+- Writes schema metadata such as `MNetworkVarNames` and `MNetworkChangeCallback` when available.
+
+## Build
+
+Requirements:
+
+- Windows
+- Visual Studio 2025 or MSVC build tools with Windows SDK
+- x64 build target
+
+Build from PowerShell:
+
+```powershell
+.\scripts\build.ps1 -Configuration Release -Platform x64
+```
+
+Or directly with MSBuild:
+
+```powershell
+msbuild .\cs2sign\cs2sign.vcxproj /p:Configuration=Release /p:Platform=x64 /m
+```
+
+The executable is written to:
+
+```text
+cs2sign\x64\Release\cs2sign.exe
+```
+
+## Usage
+
+Start CS2 first, then run:
+
+```powershell
+.\cs2sign\x64\Release\cs2sign.exe
+```
+
+Running the executable without arguments opens the menu. It asks for console output mode, signature source, and workflow.
+
+`Bad Apple mode` hides scan/dump logs and plays the embedded ASCII animation while work is running. `Q`, `Esc`, `Enter`, and `Space` stop the animation only. When the dump is ready, the animation keeps looping and shows `Dump ready - press Space to view results`; `Space` opens the final summary.
+
+GitHub signatures are the normal source. Pick Local mode when you want to test JSON files next to the exe.
+
+Scan signatures from a directory:
+
+```powershell
+.\cs2sign\x64\Release\cs2sign.exe .\signatures
+```
+
+Scan one JSON file:
+
+```powershell
+.\cs2sign\x64\Release\cs2sign.exe .\client_signatures.json
+```
+
+Useful options:
+
+```text
+--legacy-signatures
+                   Also load legacy hardcoded signatures from CS2Signatures.h.
+--json-only        Compatibility alias: keep built-in signatures disabled.
+--remote-signatures
+                   Download generated JSON signatures from the GitHub index (default).
+--remote-signatures-url <url>
+                   Override the GitHub raw index URL.
+--local-signatures Use *_signatures.json files from the exe/current directory.
+--no-signatures    Skip signature scanning and run only selected dumpers.
+--dump-all         Run read-only schemas, interfaces, offsets, and dump_info.
+--dump-schemas     Dump Source 2 schema classes/enums through ReadProcessMemory.
+--dump-interfaces  Dump Source 2 interface registries through CreateInterface exports.
+--dump-offsets     Dump curated known offsets through module pattern scanning.
+--dump-info        Write dump_info.json with timestamp, modules, and dumper status.
+--emit-sdk         Generate C++ SDK headers and one IDA header from dump\schemas.
+--output <dir>     Output directory for read-only dumpers (default: dump).
+--no-pause         Exit immediately instead of waiting for a key press.
+--help             Show usage.
+```
+
+Example for scripts/CI:
+
+```powershell
+.\cs2sign\x64\Release\cs2sign.exe .\signatures --no-pause
+```
+
+Run only the read-only dumpers:
+
+```powershell
+.\cs2sign\x64\Release\cs2sign.exe --no-signatures --dump-all --output .\dump --no-pause
+```
+
+Generate SDK headers from an existing schema dump. CS2 does not need to be running for this command:
+
+```powershell
+.\cs2sign\x64\Release\cs2sign.exe --no-signatures --emit-sdk --output .\dump --no-pause
+```
+
+## Input Format
+
+`*_signatures.json` entries are expected to look like this:
+
+```json
+{
+  "FunctionName": {
+    "pattern": "48 89 5C 24 ? 57 48 83 EC 20",
+    "module": "client",
+    "rva": "0x1832550",
+    "pattern_rva": "0x1832550",
+    "pattern_offset": 0,
+    "address_offset": 0,
+    "length": 10,
+    "display_name": "FunctionName",
+    "category": "game",
+    "quality": "good",
+    "importance": "required",
+    "required": true,
+    "confidence": 100,
+    "source": "ida_plugin",
+    "source_project": "cs2sign"
+  }
+}
+```
+
+Only `pattern` is required. `ida_pattern` is accepted as a fallback, and `code_style_pattern` is accepted when it uses `\xHH` bytes with `\x2A` wildcards. Add `module` whenever possible; it keeps scans focused. `address_offset` is used when the pattern starts inside a function and should resolve back to the entry point.
+
+`category`, `importance`, and `required` feed the update report. `game` and `module` signatures count as required unless the JSON says otherwise. `library`, `runtime`, `thunk`, and `auto` signatures count as optional.
+
+## Output
+
+Signature scan results are written to `cs2_signatures.json` in the current working directory. Each result includes `status`, `importance`, `required`, `ida_pattern`, and `code_style_pattern` so the dump can be reviewed or copied into C++ code more easily.
+
+Every run writes `dump\update_report.json` with signature health, dumper status, SDK status, build number when available, and loaded modules.
+
+Read-only dumper output is written to `dump\` by default:
+
+```text
+dump\dump_info.json
+dump\update_report.json
+dump\interfaces.json
+dump\interfaces.hpp
+dump\offsets.json
+dump\offsets.hpp
+dump\schemas\<module>.json
+dump\schemas\<module>.hpp
+dump\sdk\cpp\<module>.hpp
+dump\sdk\ida.h
+```
+
+Those files are generated output and are ignored by git.
+
+## Repository Hygiene
+
+Before a public release:
+
+- Do not commit `x64/`, `Win32/`, `compiled/`, `.exe`, `.pdb`, `.obj`, or `.tlog` files.
+- Keep the IDA plugin in `tools/ida/`.
+- Keep `signatures/index.json` and the matching `signatures/*_signatures.json` files committed. Once the repo is public, GitHub mode reads them through `raw.githubusercontent.com`.
+- Confirm the license holder in [LICENSE](LICENSE) before publishing under a different name.
+
+## Limitations
+
+- Legacy built-in signatures are stale-prone after CS2 updates. They are disabled by default.
+- The minimal JSON parser is designed for this project's generated format, not arbitrary JSON.
+- The scanner reports addresses; it does not validate semantic correctness of each match.

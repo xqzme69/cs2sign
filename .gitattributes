@@ -1,0 +1,2 @@
+*.bap binary
+signatures/*.json text eol=lf

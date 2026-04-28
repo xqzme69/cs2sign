@@ -1,0 +1,45 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.VC.opendb
+
+# Build outputs
+[Dd]ebug/
+[Rr]elease/
+[Pp]roduction/
+x64/
+Win32/
+compiled/
+**/x64/
+**/Win32/
+
+# Native build artifacts
+*.exe
+*.dll
+*.lib
+*.obj
+*.pdb
+*.ipdb
+*.iobj
+*.ilk
+*.exp
+*.recipe
+*.tlog
+*.lastbuildstate
+
+# Generated scanner output
+cs2_signatures.json
+dump/
+**/dump/
+
+# Archives and temporary files
+*.zip
+*.7z
+*.rar
+*.tmp
+*.log
+__pycache__/
+*.pyc
+tools/ida/backups/
