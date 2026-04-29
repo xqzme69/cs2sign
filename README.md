@@ -80,7 +80,7 @@ Useful options:
 --remote-signatures
                    Download generated JSON signatures from the GitHub index (default).
 --remote-signatures-url <url>
-                   Override the GitHub raw index URL.
+                   Override the GitHub signature index URL.
 --local-signatures Use *_signatures.json files from the exe/current directory.
 --no-signatures    Skip signature scanning and run only selected dumpers.
 --dump-all         Run read-only schemas, interfaces, offsets, and dump_info.
@@ -165,14 +165,12 @@ dump\sdk\ida.h
 
 Those files are generated output and are ignored by git.
 
-## Repository Hygiene
+## Maintenance Notes
 
-Before a public release:
-
-- Do not commit `x64/`, `Win32/`, `compiled/`, `.exe`, `.pdb`, `.obj`, or `.tlog` files.
-- Keep the IDA plugin in `tools/ida/`.
-- Keep `signatures/index.json` and the matching `signatures/*_signatures.json` files committed. Once the repo is public, GitHub mode reads them through `raw.githubusercontent.com`.
-- Confirm the license holder in [LICENSE](LICENSE) before publishing under a different name.
+- Generated build artifacts such as `x64/`, `Win32/`, `compiled/`, `.exe`, `.pdb`, `.obj`, and `.tlog` files are ignored by git.
+- The IDA plugin lives in `tools/ida/`.
+- GitHub mode uses `signatures/index.json` and the matching `signatures/*_signatures.json` files.
+- License and third-party notices are tracked in [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Limitations
 
