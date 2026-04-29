@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <ios>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -102,6 +103,22 @@ bool ReadTextFile(const std::filesystem::path& path, std::string& output) {
     return true;
 }
 
+bool WriteBinaryFile(const std::filesystem::path& path, const std::string& bytes, std::string& error) {
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    if (!file.is_open()) {
+        error = "failed to open file for writing: " + path.string();
+        return false;
+    }
+
+    file.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
+    if (!file.good()) {
+        error = "failed to write file: " + path.string();
+        return false;
+    }
+
+    return true;
+}
+
 bool DownloadFile(const std::string& url, const std::filesystem::path& outputPath, std::string& error) {
     std::error_code errorCode;
     std::filesystem::create_directories(outputPath.parent_path(), errorCode);
@@ -130,6 +147,68 @@ bool DownloadFile(const std::string& url, const std::filesystem::path& outputPat
         message << "download failed: 0x" << std::hex << std::uppercase << result;
         error = message.str();
         return false;
+    }
+
+    return true;
+}
+
+bool IsGitHubContentsApiUrl(const std::string& url) {
+    return url.find("https://api.github.com/repos/") == 0 &&
+           url.find("/contents/") != std::string::npos;
+}
+
+int Base64Value(char character) {
+    if (character >= 'A' && character <= 'Z') {
+        return character - 'A';
+    }
+
+    if (character >= 'a' && character <= 'z') {
+        return character - 'a' + 26;
+    }
+
+    if (character >= '0' && character <= '9') {
+        return character - '0' + 52;
+    }
+
+    if (character == '+') {
+        return 62;
+    }
+
+    if (character == '/') {
+        return 63;
+    }
+
+    return -1;
+}
+
+bool DecodeBase64(const std::string& input, std::string& output) {
+    output.clear();
+
+    int buffer = 0;
+    int bitCount = 0;
+    bool padding = false;
+    for (const char character : input) {
+        if (std::isspace(static_cast<unsigned char>(character))) {
+            continue;
+        }
+
+        if (character == '=') {
+            padding = true;
+            continue;
+        }
+
+        const int value = Base64Value(character);
+        if (value < 0 || padding) {
+            return false;
+        }
+
+        buffer = (buffer << 6) | value;
+        bitCount += 6;
+        if (bitCount >= 8) {
+            bitCount -= 8;
+            output.push_back(static_cast<char>((buffer >> bitCount) & 0xFF));
+            buffer &= (1 << bitCount) - 1;
+        }
     }
 
     return true;
@@ -197,6 +276,43 @@ bool FindStringValueInRange(
 
 bool FindStringValue(const std::string& json, const std::string& key, std::string& output) {
     return FindStringValueInRange(json, 0, json.size(), key, output);
+}
+
+bool UnpackGitHubContentsApiFile(const std::filesystem::path& path, std::string& error) {
+    std::string apiJson;
+    if (!ReadTextFile(path, apiJson)) {
+        error = "failed to read GitHub API response";
+        return false;
+    }
+
+    std::string encoding;
+    std::string content;
+    if (!FindStringValue(apiJson, "encoding", encoding) ||
+        ToLowerAscii(encoding) != "base64" ||
+        !FindStringValue(apiJson, "content", content)) {
+        error = "GitHub API response did not contain base64 file content";
+        return false;
+    }
+
+    std::string decoded;
+    if (!DecodeBase64(content, decoded)) {
+        error = "failed to decode GitHub API file content";
+        return false;
+    }
+
+    return WriteBinaryFile(path, decoded, error);
+}
+
+bool DownloadSignatureFile(const std::string& url, const std::filesystem::path& outputPath, std::string& error) {
+    if (!DownloadFile(url, outputPath, error)) {
+        return false;
+    }
+
+    if (IsGitHubContentsApiUrl(url)) {
+        return UnpackGitHubContentsApiFile(outputPath, error);
+    }
+
+    return true;
 }
 
 std::vector<RemoteSignatureFile> ParseManifestFiles(const std::string& manifestJson) {
@@ -384,7 +500,7 @@ RemoteSignatureResult ResolveRemoteSignatureFiles(const RemoteSignatureOptions& 
     const std::filesystem::path manifestPath = cacheDirectory / "index.json";
 
     std::string downloadError;
-    if (!DownloadFile(options.manifestUrl, manifestPath, downloadError)) {
+    if (!DownloadSignatureFile(options.manifestUrl, manifestPath, downloadError)) {
         result.error = "failed to download signature index: " + downloadError;
         return result;
     }
@@ -414,7 +530,7 @@ RemoteSignatureResult ResolveRemoteSignatureFiles(const RemoteSignatureOptions& 
             std::filesystem::remove(tempPath, removeError);
 
             const std::string fileUrl = JoinUrl(baseUrl, file.name);
-            if (!DownloadFile(fileUrl, tempPath, downloadError)) {
+            if (!DownloadSignatureFile(fileUrl, tempPath, downloadError)) {
                 result.error = "failed to download " + file.name + ": " + downloadError;
                 return result;
             }
