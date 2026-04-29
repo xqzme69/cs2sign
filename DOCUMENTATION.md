@@ -654,9 +654,12 @@ cs2sign/
     clean.ps1              # Local artifact cleanup helper
     update-signatures.ps1  # Rebuild signatures/index.json for GitHub mode
     verify-signatures.ps1  # Validate published signature hashes and line endings
+    verify-sdk.ps1         # Generate and syntax-check SDK output from fixtures
   signatures/
     index.json             # Remote signature manifest
     *_signatures.json      # Published signature files used by GitHub mode
+  tests/
+    sdk/schemas/           # Minimal schema fixture for SDK generator checks
   DOCUMENTATION.md
   README.md
   LICENSE

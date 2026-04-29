@@ -18,6 +18,7 @@ The repo contains the C++ scanner, the IDA signature plugin at `tools/ida/cs2_si
 - Uses `ReadProcessMemory` for target memory access.
 - Can dump Source 2 schemas, interface registries, curated known offsets, and `dump_info.json` in read-only mode.
 - Generates C++, C#, Rust, Zig, and IDA SDK output from schema dumps.
+- CI verifies the signature manifest, Windows build, SDK generation, and generated C#/Rust/Zig syntax.
 - Writes schema metadata such as `MNetworkVarNames` and `MNetworkChangeCallback` when available.
 
 ## Build

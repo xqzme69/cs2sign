@@ -18,3 +18,11 @@ jobs:
       - name: Build
         shell: pwsh
         run: .\scripts\build.ps1 -Configuration Release -Platform x64 -Target scanner -PlatformToolset v143
+
+      - name: Install Zig
+        shell: pwsh
+        run: choco install zig -y --no-progress
+
+      - name: Verify SDK output
+        shell: pwsh
+        run: .\scripts\verify-sdk.ps1 -RequireZig

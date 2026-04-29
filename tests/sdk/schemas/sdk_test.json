@@ -1,0 +1,64 @@
+{
+  "module": "sdk_test.dll",
+  "classes": [
+    {
+      "name": "KeywordFields_t",
+      "base_class": "",
+      "size": 16,
+      "metadata": [
+        {
+          "type": "Unknown",
+          "name": "MGetKV3ClassDefaults"
+        }
+      ],
+      "fields": [
+        {
+          "name": "type",
+          "type": "int32",
+          "offset": 0,
+          "metadata": []
+        },
+        {
+          "name": "Self",
+          "type": "uint64",
+          "offset": 8,
+          "metadata": []
+        }
+      ]
+    }
+  ],
+  "enums": [
+    {
+      "name": "AliasEnum_t",
+      "size": 4,
+      "fields": [
+        {
+          "name": "First",
+          "value": 0
+        },
+        {
+          "name": "AlsoFirst",
+          "value": 0
+        },
+        {
+          "name": "type",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "name": "Self",
+      "size": 4,
+      "fields": [
+        {
+          "name": "Negative",
+          "value": -1
+        },
+        {
+          "name": "Zero",
+          "value": 0
+        }
+      ]
+    }
+  ]
+}
