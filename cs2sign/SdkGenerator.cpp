@@ -403,10 +403,6 @@ bool StartsWith(std::string_view value, std::string_view prefix) {
     return value.size() >= prefix.size() && value.substr(0, prefix.size()) == prefix;
 }
 
-bool EndsWith(std::string_view value, std::string_view suffix) {
-    return value.size() >= suffix.size() && value.substr(value.size() - suffix.size()) == suffix;
-}
-
 std::string CommentText(std::string value) {
     for (char& character : value) {
         if (character == '\r' || character == '\n') {

@@ -53,6 +53,35 @@ std::string ToLowerAscii(std::string value) {
     return value;
 }
 
+std::wstring Utf8ToWide(const std::string& value) {
+    if (value.empty()) {
+        return {};
+    }
+
+    const int characterCount = MultiByteToWideChar(
+        CP_UTF8,
+        0,
+        value.data(),
+        static_cast<int>(value.size()),
+        nullptr,
+        0
+    );
+    if (characterCount <= 0) {
+        return std::wstring(value.begin(), value.end());
+    }
+
+    std::wstring result(static_cast<size_t>(characterCount), L'\0');
+    MultiByteToWideChar(
+        CP_UTF8,
+        0,
+        value.data(),
+        static_cast<int>(value.size()),
+        result.data(),
+        characterCount
+    );
+    return result;
+}
+
 std::string WideToUtf8(const std::wstring& value) {
     if (value.empty()) {
         return {};
@@ -114,6 +143,11 @@ std::string SanitizeIdentifier(std::string value, std::string fallback) {
     }
 
     return value;
+}
+
+bool EndsWith(std::string_view value, std::string_view suffix) {
+    return value.size() >= suffix.size() &&
+           value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
 bool EnsureDirectory(const std::filesystem::path& directory) {

@@ -1,12 +1,12 @@
 #include "RemoteSignatureProvider.h"
 
+#include "DumpUtils.h"
+
 #include <windows.h>
 #include <winhttp.h>
 #include <bcrypt.h>
 
-#include <algorithm>
 #include <array>
-#include <cctype>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -21,7 +21,7 @@
 
 namespace {
 constexpr DWORD kDownloadTimeoutMs = 30'000;
-constexpr int kDownloadAttempts = 3;
+constexpr int kDownloadAttempts = 4;
 constexpr wchar_t kUserAgent[] = L"cs2sign/1.0";
 
 struct RemoteSignatureFile {
@@ -43,47 +43,6 @@ struct WinHttpHandle {
     WinHttpHandle(const WinHttpHandle&) = delete;
     WinHttpHandle& operator=(const WinHttpHandle&) = delete;
 };
-
-std::wstring Utf8ToWide(const std::string& value) {
-    if (value.empty()) {
-        return {};
-    }
-
-    const int requiredSize = MultiByteToWideChar(
-        CP_UTF8,
-        0,
-        value.data(),
-        static_cast<int>(value.size()),
-        nullptr,
-        0
-    );
-    if (requiredSize <= 0) {
-        return std::wstring(value.begin(), value.end());
-    }
-
-    std::wstring result(static_cast<size_t>(requiredSize), L'\0');
-    MultiByteToWideChar(
-        CP_UTF8,
-        0,
-        value.data(),
-        static_cast<int>(value.size()),
-        result.data(),
-        requiredSize
-    );
-    return result;
-}
-
-std::string ToLowerAscii(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char character) {
-        return static_cast<char>(std::tolower(character));
-    });
-    return value;
-}
-
-bool EndsWith(const std::string& value, const std::string& suffix) {
-    return value.size() >= suffix.size() &&
-           value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
-}
 
 bool IsSafeSignatureFilename(const std::string& name) {
     if (name.empty() || name == "cs2_signatures.json") {
@@ -144,7 +103,25 @@ std::string LastErrorMessage(const char* operation) {
     return message.str();
 }
 
-bool DownloadUrlOnce(const std::string& url, std::string& output, std::string& error) {
+bool ConfigureDownloadSession(HINTERNET session, std::string& error) {
+    if (!WinHttpSetTimeouts(
+            session,
+            kDownloadTimeoutMs,
+            kDownloadTimeoutMs,
+            kDownloadTimeoutMs,
+            kDownloadTimeoutMs)) {
+        error = LastErrorMessage("WinHttpSetTimeouts");
+        return false;
+    }
+
+    return true;
+}
+
+DWORD RetryDelayMs(int attempt) {
+    return static_cast<DWORD>(1u << (attempt - 1)) * 1000;
+}
+
+bool DownloadUrlOnce(HINTERNET session, const std::string& url, std::string& output, std::string& error) {
     const std::wstring wideUrl = Utf8ToWide(url);
     URL_COMPONENTS components{};
     components.dwStructSize = sizeof(components);
@@ -172,29 +149,7 @@ bool DownloadUrlOnce(const std::string& url, std::string& output, std::string& e
         path = L"/";
     }
 
-    WinHttpHandle session(WinHttpOpen(
-        kUserAgent,
-        WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
-        WINHTTP_NO_PROXY_NAME,
-        WINHTTP_NO_PROXY_BYPASS,
-        0
-    ));
-    if (!session.value) {
-        error = LastErrorMessage("WinHttpOpen");
-        return false;
-    }
-
-    if (!WinHttpSetTimeouts(
-            session.value,
-            kDownloadTimeoutMs,
-            kDownloadTimeoutMs,
-            kDownloadTimeoutMs,
-            kDownloadTimeoutMs)) {
-        error = LastErrorMessage("WinHttpSetTimeouts");
-        return false;
-    }
-
-    WinHttpHandle connection(WinHttpConnect(session.value, host.c_str(), components.nPort, 0));
+    WinHttpHandle connection(WinHttpConnect(session, host.c_str(), components.nPort, 0));
     if (!connection.value) {
         error = LastErrorMessage("WinHttpConnect");
         return false;
@@ -276,7 +231,12 @@ bool DownloadUrlOnce(const std::string& url, std::string& output, std::string& e
     return true;
 }
 
-bool DownloadFile(const std::string& url, const std::filesystem::path& outputPath, std::string& error) {
+bool DownloadFile(
+    HINTERNET session,
+    const std::string& url,
+    const std::filesystem::path& outputPath,
+    std::string& error
+) {
     std::error_code errorCode;
     std::filesystem::create_directories(outputPath.parent_path(), errorCode);
     if (errorCode) {
@@ -286,12 +246,12 @@ bool DownloadFile(const std::string& url, const std::filesystem::path& outputPat
 
     std::string bytes;
     for (int attempt = 1; attempt <= kDownloadAttempts; ++attempt) {
-        if (DownloadUrlOnce(url, bytes, error)) {
+        if (DownloadUrlOnce(session, url, bytes, error)) {
             return WriteBinaryFile(outputPath, bytes, error);
         }
 
         if (attempt < kDownloadAttempts) {
-            Sleep(static_cast<DWORD>(attempt * 1000));
+            Sleep(RetryDelayMs(attempt));
         }
     }
 
@@ -450,8 +410,13 @@ bool UnpackGitHubContentsApiFile(const std::filesystem::path& path, std::string&
     return WriteBinaryFile(path, decoded, error);
 }
 
-bool DownloadSignatureFile(const std::string& url, const std::filesystem::path& outputPath, std::string& error) {
-    if (!DownloadFile(url, outputPath, error)) {
+bool DownloadSignatureFile(
+    HINTERNET session,
+    const std::string& url,
+    const std::filesystem::path& outputPath,
+    std::string& error
+) {
+    if (!DownloadFile(session, url, outputPath, error)) {
         return false;
     }
 
@@ -647,7 +612,24 @@ RemoteSignatureResult ResolveRemoteSignatureFiles(const RemoteSignatureOptions& 
     const std::filesystem::path manifestPath = cacheDirectory / "index.json";
 
     std::string downloadError;
-    if (!DownloadSignatureFile(options.manifestUrl, manifestPath, downloadError)) {
+    WinHttpHandle session(WinHttpOpen(
+        kUserAgent,
+        WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+        WINHTTP_NO_PROXY_NAME,
+        WINHTTP_NO_PROXY_BYPASS,
+        0
+    ));
+    if (!session.value) {
+        result.error = LastErrorMessage("WinHttpOpen");
+        return result;
+    }
+
+    if (!ConfigureDownloadSession(session.value, downloadError)) {
+        result.error = downloadError;
+        return result;
+    }
+
+    if (!DownloadSignatureFile(session.value, options.manifestUrl, manifestPath, downloadError)) {
         result.error = "failed to download signature index: " + downloadError;
         return result;
     }
@@ -677,7 +659,7 @@ RemoteSignatureResult ResolveRemoteSignatureFiles(const RemoteSignatureOptions& 
             std::filesystem::remove(tempPath, removeError);
 
             const std::string fileUrl = JoinUrl(baseUrl, file.name);
-            if (!DownloadSignatureFile(fileUrl, tempPath, downloadError)) {
+            if (!DownloadSignatureFile(session.value, fileUrl, tempPath, downloadError)) {
                 result.error = "failed to download " + file.name + ": " + downloadError;
                 return result;
             }

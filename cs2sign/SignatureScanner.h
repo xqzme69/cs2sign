@@ -87,7 +87,6 @@ private:
     uintptr_t ScanPattern(uintptr_t start, size_t size, const std::string& pattern, const std::string& mask, std::string& error);
     uintptr_t ScanPatternOptimized(uintptr_t start, size_t size, const std::string& pattern, const std::string& mask, std::string& error);
     bool ComparePattern(const uint8_t* memoryBytes, const std::string& pattern, const std::string& mask, size_t length);
-    std::string EscapeJSON(const std::string& str);
 
     ProcessMemoryReader& m_memory;
     std::vector<Signature> m_signatures;

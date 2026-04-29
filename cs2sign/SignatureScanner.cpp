@@ -1,11 +1,11 @@
 #include "SignatureScanner.h"
 
 #include "Console.h"
+#include "DumpUtils.h"
 
 #include <algorithm>
 #include <atomic>
 #include <chrono>
-#include <cctype>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -26,13 +26,6 @@ bool IsReadableRegionForScan(const MemoryRegion& region) {
            region.protect == PAGE_READONLY ||
            region.protect == PAGE_READWRITE ||
            region.protect == PAGE_WRITECOPY;
-}
-
-std::string ToLowerAscii(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char character) {
-        return static_cast<char>(std::tolower(character));
-    });
-    return value;
 }
 
 bool RegionBelongsToSignatureModule(const MemoryRegion& region, const Signature& signature) {
@@ -528,7 +521,7 @@ void SignatureScanner::WriteResultsJSON(std::ofstream& file) {
         const Signature& signature = m_signatures[signatureIndex];
 
         file << "    {\n";
-        file << "      \"name\": \"" << EscapeJSON(signature.name) << "\",\n";
+        file << "      \"name\": \"" << EscapeJson(signature.name) << "\",\n";
 
         std::ostringstream patternHex;
         std::ostringstream idaPattern;
@@ -557,22 +550,22 @@ void SignatureScanner::WriteResultsJSON(std::ofstream& file) {
         }
 
         file << "      \"pattern\": \"" << patternHex.str() << "\",\n";
-        file << "      \"ida_pattern\": \"" << EscapeJSON(idaPattern.str()) << "\",\n";
-        file << "      \"code_style_pattern\": \"" << EscapeJSON(codeStylePattern.str()) << "\",\n";
-        file << "      \"mask\": \"" << EscapeJSON(signature.mask) << "\",\n";
+        file << "      \"ida_pattern\": \"" << EscapeJson(idaPattern.str()) << "\",\n";
+        file << "      \"code_style_pattern\": \"" << EscapeJson(codeStylePattern.str()) << "\",\n";
+        file << "      \"mask\": \"" << EscapeJson(signature.mask) << "\",\n";
         if (!signature.module.empty()) {
-            file << "      \"module\": \"" << EscapeJSON(signature.module) << "\",\n";
+            file << "      \"module\": \"" << EscapeJson(signature.module) << "\",\n";
         }
         if (!signature.rva.empty()) {
-            file << "      \"rva\": \"" << EscapeJSON(signature.rva) << "\",\n";
+            file << "      \"rva\": \"" << EscapeJson(signature.rva) << "\",\n";
         }
         if (!signature.category.empty()) {
-            file << "      \"category\": \"" << EscapeJSON(signature.category) << "\",\n";
+            file << "      \"category\": \"" << EscapeJson(signature.category) << "\",\n";
         }
         if (!signature.quality.empty()) {
-            file << "      \"quality\": \"" << EscapeJSON(signature.quality) << "\",\n";
+            file << "      \"quality\": \"" << EscapeJson(signature.quality) << "\",\n";
         }
-        file << "      \"importance\": \"" << EscapeJSON(EffectiveImportance(signature)) << "\",\n";
+        file << "      \"importance\": \"" << EscapeJson(EffectiveImportance(signature)) << "\",\n";
         file << "      \"required\": " << (signature.required ? "true" : "false") << ",\n";
         file << "      \"status\": \"" << SignatureStatus(signature) << "\",\n";
         if (signature.confidence > 0) {
@@ -582,13 +575,13 @@ void SignatureScanner::WriteResultsJSON(std::ofstream& file) {
             file << "      \"source_count\": " << signature.sourceCount << ",\n";
         }
         if (!signature.source.empty()) {
-            file << "      \"source\": \"" << EscapeJSON(signature.source) << "\",\n";
+            file << "      \"source\": \"" << EscapeJson(signature.source) << "\",\n";
         }
         if (!signature.sourceProject.empty()) {
-            file << "      \"source_project\": \"" << EscapeJSON(signature.sourceProject) << "\",\n";
+            file << "      \"source_project\": \"" << EscapeJson(signature.sourceProject) << "\",\n";
         }
         if (!signature.sourceUrl.empty()) {
-            file << "      \"source_url\": \"" << EscapeJSON(signature.sourceUrl) << "\",\n";
+            file << "      \"source_url\": \"" << EscapeJson(signature.sourceUrl) << "\",\n";
         }
         file << "      \"found\": " << (signature.found ? "true" : "false") << ",\n";
 
@@ -598,7 +591,7 @@ void SignatureScanner::WriteResultsJSON(std::ofstream& file) {
             file << "      \"error\": null,\n";
         } else {
             file << "      \"address\": null,\n";
-            file << "      \"error\": \"" << EscapeJSON(signature.error) << "\",\n";
+            file << "      \"error\": \"" << EscapeJson(signature.error) << "\",\n";
         }
 
         file << "      \"regions_scanned\": " << std::dec << signature.regionsScanned << ",\n";
@@ -651,30 +644,4 @@ void SignatureScanner::WriteResultsJSON(std::ofstream& file) {
 void SignatureScanner::DumpResultsJSON(const std::string& filename) {
     m_jsonFilename = filename;
     UpdateJSONFile();
-}
-
-std::string SignatureScanner::EscapeJSON(const std::string& str) {
-    std::ostringstream escaped;
-
-    for (unsigned char character : str) {
-        switch (character) {
-            case '"': escaped << "\\\""; break;
-            case '\\': escaped << "\\\\"; break;
-            case '\b': escaped << "\\b"; break;
-            case '\f': escaped << "\\f"; break;
-            case '\n': escaped << "\\n"; break;
-            case '\r': escaped << "\\r"; break;
-            case '\t': escaped << "\\t"; break;
-            default:
-                if (character <= 0x1f) {
-                    escaped << "\\u"
-                            << std::hex << std::setw(4) << std::setfill('0')
-                            << static_cast<int>(character);
-                } else {
-                    escaped << static_cast<char>(character);
-                }
-        }
-    }
-
-    return escaped.str();
 }

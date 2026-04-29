@@ -18,7 +18,7 @@
 #include <vector>
 
 namespace {
-constexpr const char* kCs2SignVersion = "0.1.5";
+constexpr const char* kCs2SignVersion = "0.1.6";
 constexpr const char* kDefaultSignatureInputPath = "signatures.json";
 constexpr const char* kDefaultRemoteSignatureManifestUrl =
     "https://api.github.com/repos/xqzme69/cs2sign/contents/signatures/index.json?ref=main";

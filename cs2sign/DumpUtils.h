@@ -18,9 +18,11 @@ struct PatternByte {
 std::string EscapeJson(std::string_view value);
 std::string FormatHex(std::uint64_t value, bool withPrefix = true);
 std::string ToLowerAscii(std::string value);
+std::wstring Utf8ToWide(const std::string& value);
 std::string WideToUtf8(const std::wstring& value);
 std::string CurrentTimestampUtc();
 std::string SanitizeIdentifier(std::string value, std::string fallback = "unnamed");
+bool EndsWith(std::string_view value, std::string_view suffix);
 
 bool EnsureDirectory(const std::filesystem::path& directory);
 bool ParseIdaPattern(std::string_view pattern, std::vector<PatternByte>& bytes);
