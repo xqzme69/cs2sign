@@ -154,7 +154,7 @@ void PrintUsage() {
         << "  --dump-interfaces  Dump Source 2 interface registries through CreateInterface exports.\n"
         << "  --dump-offsets     Dump curated known offsets through module pattern scanning.\n"
         << "  --dump-info        Write dump_info.json with timestamp, modules, and dumper status.\n"
-        << "  --emit-sdk         Generate C++ SDK headers and one IDA header from dump\\schemas.\n"
+        << "  --emit-sdk         Generate SDK files from dump\\schemas.\n"
         << "  --output <dir>     Output directory for read-only dumpers (default: dump).\n"
         << "  --no-pause         Exit immediately instead of waiting for a key press.\n"
         << "  --help             Show this help text.\n";
@@ -320,12 +320,28 @@ void PrintSdkGenerationSummary(const SdkGenerationReport& report) {
         L", enums -> " + std::to_wstring(report.enumCount)
     );
 
-    Console::PrintSuccess(L"C++ headers -> " + std::to_wstring(report.cppFileCount) + L" file(s)");
+    Console::PrintSuccess(
+        L"SDK files -> " +
+        std::to_wstring(report.cppFileCount + report.csharpFileCount + report.rustFileCount + report.zigFileCount) +
+        L" language file(s), 1 IDA header"
+    );
 
     Console::SetColor(Console::CYAN);
     std::cout << "  [*] C++ SDK: ";
     Console::SetColor(Console::YELLOW);
     std::cout << report.cppDirectory.string() << std::endl;
+    Console::SetColor(Console::CYAN);
+    std::cout << "  [*] C# SDK: ";
+    Console::SetColor(Console::YELLOW);
+    std::cout << report.csharpDirectory.string() << std::endl;
+    Console::SetColor(Console::CYAN);
+    std::cout << "  [*] Rust SDK: ";
+    Console::SetColor(Console::YELLOW);
+    std::cout << report.rustDirectory.string() << std::endl;
+    Console::SetColor(Console::CYAN);
+    std::cout << "  [*] Zig SDK: ";
+    Console::SetColor(Console::YELLOW);
+    std::cout << report.zigDirectory.string() << std::endl;
     Console::SetColor(Console::CYAN);
     std::cout << "  [*] IDA header: ";
     Console::SetColor(Console::YELLOW);
@@ -865,6 +881,10 @@ void WriteUpdateReport(
     file << "    \"modules\": " << (report.hasSdkReport ? report.sdkReport.moduleCount : 0) << ",\n";
     file << "    \"classes\": " << (report.hasSdkReport ? report.sdkReport.classCount : 0) << ",\n";
     file << "    \"enums\": " << (report.hasSdkReport ? report.sdkReport.enumCount : 0) << ",\n";
+    file << "    \"cpp_files\": " << (report.hasSdkReport ? report.sdkReport.cppFileCount : 0) << ",\n";
+    file << "    \"csharp_files\": " << (report.hasSdkReport ? report.sdkReport.csharpFileCount : 0) << ",\n";
+    file << "    \"rust_files\": " << (report.hasSdkReport ? report.sdkReport.rustFileCount : 0) << ",\n";
+    file << "    \"zig_files\": " << (report.hasSdkReport ? report.sdkReport.zigFileCount : 0) << ",\n";
     file << "    \"error\": \"" << EscapeJson(report.hasSdkReport ? report.sdkReport.error : "") << "\"\n";
     file << "  },\n";
 
@@ -992,7 +1012,14 @@ void PrintQuietRunSummary(
     if (report.hasSdkReport) {
         if (report.sdkReport.success) {
             Console::PrintInfo(
-                L"SDK: " + std::to_wstring(report.sdkReport.cppFileCount) + L" C++ header(s)"
+                L"SDK: " +
+                std::to_wstring(
+                    report.sdkReport.cppFileCount +
+                    report.sdkReport.csharpFileCount +
+                    report.sdkReport.rustFileCount +
+                    report.sdkReport.zigFileCount
+                ) +
+                L" language file(s)"
             );
         } else {
             const std::wstring error(report.sdkReport.error.begin(), report.sdkReport.error.end());

@@ -7,7 +7,7 @@ Counter-Strike 2 signature and dump tooling:
 1. **IDA Plugin** (`cs2_sig_dumper.py`) — generates byte-pattern signatures from CS2 DLLs using IDA Pro
 2. **C++ Runtime Scanner** (`cs2sign.exe`) — scans live CS2 process memory to find those signatures
 3. **Read-Only Dumpers** (`cs2sign.exe --dump-*`) — dumps Source 2 schemas, interface registries, curated offsets, and run metadata through `ReadProcessMemory`
-4. **SDK Generator** (`cs2sign.exe --emit-sdk`) — generates C++ SDK headers and one IDA header from `dump/schemas/*.json`
+4. **SDK Generator** (`cs2sign.exe --emit-sdk`) — generates C++, C#, Rust, Zig, and IDA output from `dump/schemas/*.json`
 
 ```
 IDA Pro + DLL files
@@ -37,7 +37,11 @@ IDA Pro + DLL files
        +--> dump/dump_info.json
        +--> dump/update_report.json
        |
-       +--> dump/sdk/cpp/*.hpp + dump/sdk/ida.h
+       +--> dump/sdk/cpp/*.hpp
+       +--> dump/sdk/csharp/*.cs
+       +--> dump/sdk/rust/*.rs
+       +--> dump/sdk/zig/*.zig
+       +--> dump/sdk/ida.h
 
 ```
 
@@ -126,7 +130,7 @@ Automatically uses the input filename (e.g., `client.dll` -> `client`, `engine2.
 | `BadApplePlayer.h / BadApplePlayer.cpp` | Embedded ASCII animation shown when console logs are disabled |
 | `DumpUtils.h / DumpUtils.cpp` | Shared JSON/path/string/pattern/PE helpers for dumpers |
 | `ExternalDumpers.h / ExternalDumpers.cpp` | Read-only schema, interface, known offset, and info dumpers |
-| `SdkGenerator.h / SdkGenerator.cpp` | Generates packed C++ headers and a single IDA C header from schema JSON |
+| `SdkGenerator.h / SdkGenerator.cpp` | Generates C++, C#, Rust, Zig, and IDA SDK output from schema JSON |
 | `BadAppleResources.rc` / `bad_apple_frames.bap` | Windows resource entry and compressed Bad Apple frame pack |
 | `signatures/` | Published GitHub signature pack and `index.json` manifest |
 | `tools/ida/cs2_sig_dumper.py` | IDA plugin that generates fresh signatures |
@@ -649,6 +653,7 @@ cs2sign/
     build.ps1              # Build helper
     clean.ps1              # Local artifact cleanup helper
     update-signatures.ps1  # Rebuild signatures/index.json for GitHub mode
+    verify-signatures.ps1  # Validate published signature hashes and line endings
   signatures/
     index.json             # Remote signature manifest
     *_signatures.json      # Published signature files used by GitHub mode
@@ -656,8 +661,11 @@ cs2sign/
   README.md
   LICENSE
   THIRD_PARTY_NOTICES.md
+  .editorconfig
+  .clang-format
   .gitignore
   .gitattributes
+  .github/workflows/build.yml
 
 tools/
   ida/

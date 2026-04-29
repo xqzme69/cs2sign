@@ -4,7 +4,7 @@ Read-only Counter-Strike 2 signature scanner and dumper.
 
 `cs2sign` opens a running `cs2.exe` process with query/read rights, loads byte-pattern signatures, scans readable memory regions, and writes matches to `cs2_signatures.json`.
 
-The repo contains the C++ scanner, the IDA signature plugin at `tools/ida/cs2_sig_dumper.py`, read-only dumpers for schemas/interfaces/known offsets, and an SDK generator.
+The repo contains the C++ scanner, the IDA signature plugin at `tools/ida/cs2_sig_dumper.py`, read-only dumpers for schemas/interfaces/known offsets, and a multi-language SDK generator.
 
 ## Features
 
@@ -17,6 +17,7 @@ The repo contains the C++ scanner, the IDA signature plugin at `tools/ida/cs2_si
 - Supports generated `address_offset` values so signatures can match inside a function but still resolve to the function start.
 - Uses `ReadProcessMemory` for target memory access.
 - Can dump Source 2 schemas, interface registries, curated known offsets, and `dump_info.json` in read-only mode.
+- Generates C++, C#, Rust, Zig, and IDA SDK output from schema dumps.
 - Writes schema metadata such as `MNetworkVarNames` and `MNetworkChangeCallback` when available.
 
 ## Build
@@ -88,7 +89,7 @@ Useful options:
 --dump-interfaces  Dump Source 2 interface registries through CreateInterface exports.
 --dump-offsets     Dump curated known offsets through module pattern scanning.
 --dump-info        Write dump_info.json with timestamp, modules, and dumper status.
---emit-sdk         Generate C++ SDK headers and one IDA header from dump\schemas.
+--emit-sdk         Generate SDK files from dump\schemas.
 --output <dir>     Output directory for read-only dumpers (default: dump).
 --no-pause         Exit immediately instead of waiting for a key press.
 --help             Show usage.
@@ -106,7 +107,7 @@ Run only the read-only dumpers:
 .\cs2sign\x64\Release\cs2sign.exe --no-signatures --dump-all --output .\dump --no-pause
 ```
 
-Generate SDK headers from an existing schema dump. CS2 does not need to be running for this command:
+Generate SDK files from an existing schema dump. CS2 does not need to be running for this command:
 
 ```powershell
 .\cs2sign\x64\Release\cs2sign.exe --no-signatures --emit-sdk --output .\dump --no-pause
@@ -160,6 +161,9 @@ dump\offsets.hpp
 dump\schemas\<module>.json
 dump\schemas\<module>.hpp
 dump\sdk\cpp\<module>.hpp
+dump\sdk\csharp\<module>.cs
+dump\sdk\rust\<module>.rs
+dump\sdk\zig\<module>.zig
 dump\sdk\ida.h
 ```
 
@@ -177,3 +181,4 @@ Those files are generated output and are ignored by git.
 - Legacy built-in signatures are stale-prone after CS2 updates. They are disabled by default.
 - The minimal JSON parser is designed for this project's generated format, not arbitrary JSON.
 - The scanner reports addresses; it does not validate semantic correctness of each match.
+- C#, Rust, and Zig SDK files expose schema offsets as constants. The C++ SDK keeps the packed struct layout.

@@ -13,21 +13,44 @@ $ErrorActionPreference = "Stop"
 
 $Root = Split-Path -Parent $PSScriptRoot
 
-$Command = Get-Command msbuild.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($Command) {
-    $MSBuild = $Command.Source
-} else {
+function Resolve-MSBuild {
+    $Command = Get-Command msbuild.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($Command) {
+        return $Command.Source
+    }
+
+    $VsWhereCandidates = @(
+        (Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"),
+        (Join-Path $env:ProgramFiles "Microsoft Visual Studio\Installer\vswhere.exe")
+    ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+
+    foreach ($VsWhere in $VsWhereCandidates) {
+        $Found = & $VsWhere -latest -products * -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\amd64\MSBuild.exe" |
+            Select-Object -First 1
+        if ($Found -and (Test-Path -LiteralPath $Found)) {
+            return $Found
+        }
+
+        $Found = & $VsWhere -latest -products * -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe" |
+            Select-Object -First 1
+        if ($Found -and (Test-Path -LiteralPath $Found)) {
+            return $Found
+        }
+    }
+
     $Candidates = @(
         "C:\Program Files\Microsoft Visual Studio\18\Professional\MSBuild\Current\Bin\amd64\MSBuild.exe",
         "C:\Program Files\Microsoft Visual Studio\18\Professional\MSBuild\Current\Bin\MSBuild.exe",
+        "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\amd64\MSBuild.exe",
         "C:\Program Files\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\amd64\MSBuild.exe",
         "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\amd64\MSBuild.exe",
         "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\amd64\MSBuild.exe"
     )
 
-    $MSBuild = $Candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    return $Candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 }
 
+$MSBuild = Resolve-MSBuild
 if (-not $MSBuild) {
     throw "MSBuild.exe was not found. Install Visual Studio or run this from a Developer PowerShell."
 }

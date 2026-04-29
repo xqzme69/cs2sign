@@ -11,7 +11,7 @@ The executable opens `cs2.exe` with `PROCESS_QUERY_INFORMATION | PROCESS_VM_READ
 | Runtime scanner | `cs2sign\` | Scans a running `cs2.exe` for byte signatures |
 | IDA plugin | `tools\ida\cs2_sig_dumper.py` | Generates fresh `*_signatures.json` files from DLLs opened in IDA |
 | Read-only dumpers | `cs2sign.exe --dump-*` | Dumps schemas, interfaces, known offsets, and run info externally |
-| SDK generator | `cs2sign.exe --emit-sdk` | Generates C++ headers and one IDA header from schema JSON |
+| SDK generator | `cs2sign.exe --emit-sdk` | Generates C++, C#, Rust, Zig, and IDA output from schema JSON |
 
 ## Build
 
@@ -43,7 +43,7 @@ Run without arguments to open the interactive menu:
 
 The menu offers:
 
-1. Full workflow: scan signatures, run read-only dumpers, then generate SDK headers.
+1. Full workflow: scan signatures, run read-only dumpers, then generate SDK files.
 2. Signature scan only.
 3. Read-only dump only.
 4. Generate SDK from existing `dump\schemas`.
@@ -187,7 +187,7 @@ dump\schemas\<module>.hpp
 
 If one dumper fails after a CS2 update, the other dumpers still run. The failure is recorded in `dump_info.json`.
 
-Generate SDK headers from an existing schema dump:
+Generate SDK files from an existing schema dump:
 
 ```powershell
 .\cs2sign\x64\Release\cs2sign.exe --no-signatures --emit-sdk --output .\dump --no-pause
@@ -202,7 +202,7 @@ This command reads `dump\schemas\*.json` and does not require CS2 to be running.
 | `--json-only` | Compatibility alias: keep built-in signatures disabled |
 | `--legacy-signatures` | Also load legacy hardcoded signatures from `CS2Signatures.h` |
 | `--remote-signatures` | Download generated JSON signatures from the GitHub index (default) |
-| `--remote-signatures-url <url>` | Override the GitHub raw signature index URL |
+| `--remote-signatures-url <url>` | Override the GitHub signature index URL |
 | `--local-signatures` | Use `*_signatures.json` files from the exe/current directory |
 | `--no-signatures` | Skip signature scanning and run only selected dumpers |
 | `--dump-all` | Run schemas, interfaces, offsets, and info dumpers |
@@ -210,7 +210,7 @@ This command reads `dump\schemas\*.json` and does not require CS2 to be running.
 | `--dump-interfaces` | Dump interface registry entries from loaded modules |
 | `--dump-offsets` | Dump curated known offsets through pattern scanning |
 | `--dump-info` | Write timestamp, module list, build number, and dumper status |
-| `--emit-sdk` | Generate `dump\sdk\cpp\*.hpp` and `dump\sdk\ida.h` from schema JSON |
+| `--emit-sdk` | Generate `dump\sdk\cpp`, `csharp`, `rust`, `zig`, and `ida.h` from schema JSON |
 | `--output <dir>` | Set read-only dumper output directory |
 | `--no-pause` | Exit without waiting for a key press |
 | `--help` | Print help text |
@@ -247,6 +247,18 @@ Written by `--dump-schemas`. Contains classes, fields, field offsets, enums, inh
 
 Written by `--emit-sdk`. Contains packed C++ structs with padding, typed primitive fields where safe, original schema type comments, and `static_assert` checks for class size and field offsets.
 
+### `dump\sdk\csharp\<module>.cs`
+
+Written by `--emit-sdk`. Contains C# enum definitions and field offset constants.
+
+### `dump\sdk\rust\<module>.rs`
+
+Written by `--emit-sdk`. Contains Rust typed enum constants and field offset constants.
+
+### `dump\sdk\zig\<module>.zig`
+
+Written by `--emit-sdk`. Contains Zig typed enum constants and field offset constants.
+
 ### `dump\sdk\ida.h`
 
 Written by `--emit-sdk`. Single C-style header intended for IDA local types import.
@@ -271,7 +283,7 @@ Signature health is based on required signatures. Optional misses are shown for 
 .\cs2sign\x64\Release\cs2sign.exe --no-signatures --dump-all --output .\dump --no-pause
 ```
 
-4. Generate SDK headers:
+4. Generate SDK files:
 
 ```powershell
 .\cs2sign\x64\Release\cs2sign.exe --no-signatures --emit-sdk --output .\dump --no-pause

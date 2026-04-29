@@ -8,17 +8,26 @@ struct SdkGenerationOptions {
     std::filesystem::path outputDirectory = "dump/sdk";
     bool emitCpp = true;
     bool emitIda = true;
+    bool emitCSharp = true;
+    bool emitRust = true;
+    bool emitZig = true;
 };
 
 struct SdkGenerationReport {
     bool success = false;
     std::string error;
     std::filesystem::path cppDirectory;
+    std::filesystem::path csharpDirectory;
+    std::filesystem::path rustDirectory;
+    std::filesystem::path zigDirectory;
     std::filesystem::path idaHeader;
     size_t moduleCount = 0;
     size_t classCount = 0;
     size_t enumCount = 0;
     size_t cppFileCount = 0;
+    size_t csharpFileCount = 0;
+    size_t rustFileCount = 0;
+    size_t zigFileCount = 0;
 };
 
 SdkGenerationReport GenerateSdkFromSchemas(const SdkGenerationOptions& options);
