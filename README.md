@@ -10,7 +10,6 @@ The repo contains the C++ scanner, the IDA signature plugin at `tools/ida/cs2_si
 
 - Pulls generated `*_signatures.json` files from `signatures/index.json` on GitHub.
 - Local mode loads `*_signatures.json` files next to the executable.
-- Legacy built-in signatures stay behind `--legacy-signatures`.
 - Accepts one signature JSON file or a directory path as input.
 - Supports IDA-style patterns such as `48 89 5C 24 ? 57`.
 - Filters scans by module when JSON entries include a `module` field.
@@ -76,9 +75,6 @@ Scan one JSON file:
 Useful options:
 
 ```text
---legacy-signatures
-                   Also load legacy hardcoded signatures from CS2Signatures.h.
---json-only        Compatibility alias: keep built-in signatures disabled.
 --remote-signatures
                    Download generated JSON signatures from the GitHub index (default).
 --remote-signatures-url <url>

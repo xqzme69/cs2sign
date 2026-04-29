@@ -37,7 +37,7 @@ public:
     SignatureScanner(ProcessMemoryReader& memory);
     ~SignatureScanner();
 
-    // Add signature from raw bytes + mask (legacy)
+    // Add signature from raw bytes + mask.
     void AddSignature(const std::string& name, const std::string& pattern, const std::string& mask, intptr_t offset = 0);
     void AddSignature(const std::string& name, const char* pattern, size_t patternLen, const std::string& mask, intptr_t offset = 0);
 

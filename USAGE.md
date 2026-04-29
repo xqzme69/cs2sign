@@ -199,8 +199,6 @@ This command reads `dump\schemas\*.json` and does not require CS2 to be running.
 
 | Option | Description |
 |--------|-------------|
-| `--json-only` | Compatibility alias: keep built-in signatures disabled |
-| `--legacy-signatures` | Also load legacy hardcoded signatures from `CS2Signatures.h` |
 | `--remote-signatures` | Download generated JSON signatures from the GitHub index (default) |
 | `--remote-signatures-url <url>` | Override the GitHub signature index URL |
 | `--local-signatures` | Use `*_signatures.json` files from the exe/current directory |
@@ -309,7 +307,7 @@ Make sure CS2 is running. If the process still cannot be opened, check account p
 
 ### `No *_signatures.json files found`
 
-GitHub signatures are the normal source. In Local mode, place generated `*_signatures.json` files next to `cs2sign.exe` or pass a directory path. Use `--legacy-signatures` only when testing the old hardcoded set.
+GitHub signatures are the normal source. In Local mode, place generated `*_signatures.json` files next to `cs2sign.exe` or pass a directory path.
 
 ### A known offset says `pattern not found`
 

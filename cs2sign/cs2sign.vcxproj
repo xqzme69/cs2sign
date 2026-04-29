@@ -191,7 +191,6 @@
     <ClInclude Include="SignatureScanner.h" />
     <ClInclude Include="JSONParser.h" />
     <ClInclude Include="SignatureLoader.h" />
-    <ClInclude Include="CS2Signatures.h" />
     <ClInclude Include="Console.h" />
     <ClInclude Include="DumpUtils.h" />
     <ClInclude Include="ExternalDumpers.h" />

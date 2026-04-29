@@ -21,10 +21,9 @@ IDA Pro + DLL files
        v
   signatures/index.json (GitHub) or local *_signatures.json
        |
-       +-----------------------------+
-       |                             |
-       v                             v
-  RemoteSignatureProvider      CS2Signatures.h (legacy opt-in)
+       |
+       v
+  RemoteSignatureProvider / local files
        |
        v
    cs2sign.exe  <---->  cs2.exe (live process)
@@ -122,7 +121,6 @@ Automatically uses the input filename (e.g., `client.dll` -> `client`, `engine2.
 | `main.cpp` | Entry point, CLI/menu handling, workflow selection, update report orchestration |
 | `ProcessMemoryReader.h / ProcessMemoryReader.cpp` | Process attachment, memory reading, region enumeration |
 | `SignatureScanner.h / SignatureScanner.cpp` | Core scanning engine, pattern matching, multi-threading |
-| `CS2Signatures.h` | 250 legacy hardcoded signatures (static, opt-in, expected to break on updates) |
 | `JSONParser.h / JSONParser.cpp` | Minimal JSON parser for IDA plugin output |
 | `SignatureLoader.h` | Bridge: reads JSON -> adds signatures to scanner |
 | `RemoteSignatureProvider.h / RemoteSignatureProvider.cpp` | Downloads and validates the GitHub signature pack, with a local cache |
@@ -134,8 +132,6 @@ Automatically uses the input filename (e.g., `client.dll` -> `client`, `engine2.
 | `BadAppleResources.rc` / `bad_apple_frames.bap` | Windows resource entry and compressed Bad Apple frame pack |
 | `signatures/` | Published GitHub signature pack and `index.json` manifest |
 | `tools/ida/cs2_sig_dumper.py` | IDA plugin that generates fresh signatures |
-
-`CS2Signatures.h` is legacy fallback data. It loads only with `--legacy-signatures`.
 
 ---
 
@@ -203,11 +199,10 @@ Example:
 2. `Console::PrintBanner()` — animated ASCII art banner
 3. Parse CLI/menu options
 4. `ProcessMemoryReader::Attach("cs2.exe")` — find and attach to CS2 process
-5. Optionally call `AddCS2Signatures(scanner)` only when `--legacy-signatures` is set
-6. Resolve signatures from GitHub, or from local files when Local mode/path input is selected
-7. `scanner.ScanAll()` — scan all signatures in memory
-8. Print results summary
-9. Output saved to `cs2_signatures.json` and `dump/update_report.json`
+5. Resolve signatures from GitHub, or from local files when Local mode/path input is selected
+6. `scanner.ScanAll()` — scan all signatures in memory
+7. Print results summary
+8. Output saved to `cs2_signatures.json` and `dump/update_report.json`
 
 **Signature source logic:**
 
@@ -310,37 +305,6 @@ This is critical for performance — engine2 signatures only scan engine2.dll re
 
 ---
 
-### CS2Signatures.h
-
-Contains 250 legacy hardcoded signatures added via macro:
-
-```cpp
-#define PATTERN(name, bytes, len, mask, offset) \
-    scanner.AddSignature(name, bytes, len, mask, offset)
-```
-
-**Categories of hardcoded signatures:**
-
-| Category | Examples | Count |
-|----------|----------|-------|
-| Entity System | EntityList, LocalPlayer, EntityCount | ~5 |
-| View/Camera | ViewMatrix, ViewAngles, CameraPosition | ~4 |
-| Input | InputSystem, MouseInput, KeyboardInput | ~3 |
-| Game State | GameResources, GameRules, ClientState | ~6 |
-| Timing | GlobalVars, ClientTime, ServerTime, FrameTime | ~4 |
-| Rendering | RenderView, DrawModel, MaterialOverride | ~10 |
-| Network | NetworkChannel, SendNetMessage, SendDatagram | ~4 |
-| Weapons | WeaponSystem, GetSpread, GetInaccuracy | ~20 |
-| Player Data | PlayerInfo, PlayerArmor, PlayerKills | ~15 |
-| Engine Interfaces | EngineClient, Surface, Panel, ConVar | ~15 |
-| Steam API | SteamAPI, SteamFriends, SteamUser, etc. | ~20 |
-| Memory/System | MemAlloc, FileSystem, KeyValues | ~6 |
-| Visual Effects | GlowManager, ScopeOverlay, Crosshair | ~10 |
-
-**Important:** These signatures are static. They will break when CS2 updates change function prologues. The JSON-based signatures from the IDA plugin are the solution for surviving updates.
-
----
-
 ### JSONParser.h / JSONParser.cpp
 
 **Purpose:** Parse the IDA plugin's JSON output format.
@@ -435,7 +399,6 @@ Attach to cs2.exe (ReadProcessMemory access)
 Load signatures:
   1. GitHub signature pack from signatures/index.json
   2. Local *_signatures.json files — selected through Local mode/path input
-  3. Legacy hardcoded signatures (CS2Signatures.h) — opt-in fallback
        |
        v
 For each signature:
@@ -642,7 +605,6 @@ cs2sign/
     BadApplePlayer.h/.cpp  # Console animation when logs are disabled
     BadAppleResources.rc   # Resource entry for the embedded frame pack
     bad_apple_frames.bap   # Compressed Bad Apple frame pack
-    CS2Signatures.h       # 250 legacy hardcoded signatures, opt-in
     JSONParser.h           # JSON parser (header)
     JSONParser.cpp         # JSON parser (implementation)
     SignatureLoader.h      # JSON -> Scanner bridge
@@ -689,14 +651,6 @@ tools/
 
 ## Known Limitations
 
-1. **Legacy hardcoded signatures are brittle** — they break on updates and are disabled by default. The IDA JSON flow plus the published GitHub signature pack is the normal update path.
+1. **Single-threaded per signature** — while signatures are scanned sequentially, each signature scan is efficient (4MB chunks, fast-path byte checks). Multi-signature parallelism is not implemented.
 
-2. **Many hardcoded signatures use identical patterns** — e.g., `55 8B EC 83 EC 08 8B 45 08 8B 0D` appears 40+ times. These are 32-bit (x86) function prologues that don't exist in CS2's 64-bit binaries. They will never be found.
-
-3. **Some signatures have pattern/mask length mismatches** — e.g., `DrawModelFunction` has a 32-byte pattern but 34-character mask. These are flagged as errors and skipped.
-
-4. **No deduplication** — if the same signature name appears in both legacy hardcoded data and JSON, both are scanned independently when `--legacy-signatures` is used.
-
-5. **Single-threaded per signature** — while signatures are scanned sequentially, each signature scan is efficient (4MB chunks, fast-path byte checks). Multi-signature parallelism is not implemented.
-
-6. **Console encoding** — wide string conversion `std::wstring wjf(jf.begin(), jf.end())` is lossy for non-ASCII paths. File paths with Cyrillic characters may display incorrectly in console output.
+2. **Console encoding** — wide string conversion `std::wstring wjf(jf.begin(), jf.end())` is lossy for non-ASCII paths. File paths with Cyrillic characters may display incorrectly in console output.
