@@ -9,6 +9,7 @@ The repo contains the C++ scanner, the IDA signature plugin at `tools/ida/cs2_si
 ## Features
 
 - Pulls generated `*_signatures.json` files from `signatures/index.json` on GitHub.
+- Uses WinHTTP with timeouts and retries for remote signature downloads.
 - Local mode loads `*_signatures.json` files next to the executable.
 - Accepts one signature JSON file or a directory path as input.
 - Supports IDA-style patterns such as `48 89 5C 24 ? 57`.

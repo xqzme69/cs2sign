@@ -123,7 +123,7 @@ Automatically uses the input filename (e.g., `client.dll` -> `client`, `engine2.
 | `SignatureScanner.h / SignatureScanner.cpp` | Core scanning engine, pattern matching, multi-threading |
 | `JSONParser.h / JSONParser.cpp` | Minimal JSON parser for IDA plugin output |
 | `SignatureLoader.h` | Bridge: reads JSON -> adds signatures to scanner |
-| `RemoteSignatureProvider.h / RemoteSignatureProvider.cpp` | Downloads and validates the GitHub signature pack, with a local cache |
+| `RemoteSignatureProvider.h / RemoteSignatureProvider.cpp` | Downloads and validates the GitHub signature pack, with timeouts, retries, and a local cache |
 | `Console.h / Console.cpp` | Colored console output, menu prompts, animated banner |
 | `BadApplePlayer.h / BadApplePlayer.cpp` | Embedded ASCII animation shown when console logs are disabled |
 | `DumpUtils.h / DumpUtils.cpp` | Shared JSON/path/string/pattern/PE helpers for dumpers |

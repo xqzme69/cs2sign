@@ -1,7 +1,7 @@
 #include "RemoteSignatureProvider.h"
 
 #include <windows.h>
-#include <urlmon.h>
+#include <winhttp.h>
 #include <bcrypt.h>
 
 #include <algorithm>
@@ -16,13 +16,32 @@
 #include <string>
 #include <vector>
 
-#pragma comment(lib, "urlmon.lib")
+#pragma comment(lib, "winhttp.lib")
 #pragma comment(lib, "bcrypt.lib")
 
 namespace {
+constexpr DWORD kDownloadTimeoutMs = 30'000;
+constexpr int kDownloadAttempts = 3;
+constexpr wchar_t kUserAgent[] = L"cs2sign/1.0";
+
 struct RemoteSignatureFile {
     std::string name;
     std::string sha256;
+};
+
+struct WinHttpHandle {
+    HINTERNET value = nullptr;
+
+    WinHttpHandle() = default;
+    explicit WinHttpHandle(HINTERNET handle) : value(handle) {}
+    ~WinHttpHandle() {
+        if (value) {
+            WinHttpCloseHandle(value);
+        }
+    }
+
+    WinHttpHandle(const WinHttpHandle&) = delete;
+    WinHttpHandle& operator=(const WinHttpHandle&) = delete;
 };
 
 std::wstring Utf8ToWide(const std::string& value) {
@@ -119,6 +138,144 @@ bool WriteBinaryFile(const std::filesystem::path& path, const std::string& bytes
     return true;
 }
 
+std::string LastErrorMessage(const char* operation) {
+    std::ostringstream message;
+    message << operation << " failed: " << GetLastError();
+    return message.str();
+}
+
+bool DownloadUrlOnce(const std::string& url, std::string& output, std::string& error) {
+    const std::wstring wideUrl = Utf8ToWide(url);
+    URL_COMPONENTS components{};
+    components.dwStructSize = sizeof(components);
+    components.dwSchemeLength = static_cast<DWORD>(-1);
+    components.dwHostNameLength = static_cast<DWORD>(-1);
+    components.dwUrlPathLength = static_cast<DWORD>(-1);
+    components.dwExtraInfoLength = static_cast<DWORD>(-1);
+
+    if (!WinHttpCrackUrl(wideUrl.c_str(), 0, 0, &components)) {
+        error = LastErrorMessage("WinHttpCrackUrl");
+        return false;
+    }
+
+    if (components.nScheme != INTERNET_SCHEME_HTTP && components.nScheme != INTERNET_SCHEME_HTTPS) {
+        error = "unsupported URL scheme";
+        return false;
+    }
+
+    const std::wstring host(components.lpszHostName, components.dwHostNameLength);
+    std::wstring path(components.lpszUrlPath, components.dwUrlPathLength);
+    if (components.dwExtraInfoLength > 0) {
+        path.append(components.lpszExtraInfo, components.dwExtraInfoLength);
+    }
+    if (path.empty()) {
+        path = L"/";
+    }
+
+    WinHttpHandle session(WinHttpOpen(
+        kUserAgent,
+        WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+        WINHTTP_NO_PROXY_NAME,
+        WINHTTP_NO_PROXY_BYPASS,
+        0
+    ));
+    if (!session.value) {
+        error = LastErrorMessage("WinHttpOpen");
+        return false;
+    }
+
+    if (!WinHttpSetTimeouts(
+            session.value,
+            kDownloadTimeoutMs,
+            kDownloadTimeoutMs,
+            kDownloadTimeoutMs,
+            kDownloadTimeoutMs)) {
+        error = LastErrorMessage("WinHttpSetTimeouts");
+        return false;
+    }
+
+    WinHttpHandle connection(WinHttpConnect(session.value, host.c_str(), components.nPort, 0));
+    if (!connection.value) {
+        error = LastErrorMessage("WinHttpConnect");
+        return false;
+    }
+
+    const DWORD requestFlags = components.nScheme == INTERNET_SCHEME_HTTPS ? WINHTTP_FLAG_SECURE : 0;
+    WinHttpHandle request(WinHttpOpenRequest(
+        connection.value,
+        L"GET",
+        path.c_str(),
+        nullptr,
+        WINHTTP_NO_REFERER,
+        WINHTTP_DEFAULT_ACCEPT_TYPES,
+        requestFlags
+    ));
+    if (!request.value) {
+        error = LastErrorMessage("WinHttpOpenRequest");
+        return false;
+    }
+
+    constexpr wchar_t headers[] = L"Accept: application/vnd.github+json\r\n";
+    if (!WinHttpSendRequest(
+            request.value,
+            headers,
+            static_cast<DWORD>(-1),
+            WINHTTP_NO_REQUEST_DATA,
+            0,
+            0,
+            0)) {
+        error = LastErrorMessage("WinHttpSendRequest");
+        return false;
+    }
+
+    if (!WinHttpReceiveResponse(request.value, nullptr)) {
+        error = LastErrorMessage("WinHttpReceiveResponse");
+        return false;
+    }
+
+    DWORD statusCode = 0;
+    DWORD statusCodeSize = sizeof(statusCode);
+    if (!WinHttpQueryHeaders(
+            request.value,
+            WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+            WINHTTP_HEADER_NAME_BY_INDEX,
+            &statusCode,
+            &statusCodeSize,
+            WINHTTP_NO_HEADER_INDEX)) {
+        error = LastErrorMessage("WinHttpQueryHeaders");
+        return false;
+    }
+
+    if (statusCode < 200 || statusCode >= 300) {
+        std::ostringstream message;
+        message << "HTTP " << statusCode;
+        error = message.str();
+        return false;
+    }
+
+    output.clear();
+    std::array<char, 64 * 1024> buffer{};
+    for (;;) {
+        DWORD bytesRead = 0;
+        if (!WinHttpReadData(
+                request.value,
+                buffer.data(),
+                static_cast<DWORD>(buffer.size()),
+                &bytesRead)) {
+            error = LastErrorMessage("WinHttpReadData");
+            return false;
+        }
+
+        if (bytesRead == 0) {
+            break;
+        }
+
+        output.append(buffer.data(), bytesRead);
+    }
+
+    return true;
+}
+
 bool DownloadFile(const std::string& url, const std::filesystem::path& outputPath, std::string& error) {
     std::error_code errorCode;
     std::filesystem::create_directories(outputPath.parent_path(), errorCode);
@@ -127,29 +284,19 @@ bool DownloadFile(const std::string& url, const std::filesystem::path& outputPat
         return false;
     }
 
-    const std::wstring wideUrl = Utf8ToWide(url);
-    const std::wstring wideOutputPath = outputPath.wstring();
-    const HRESULT comResult = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    const bool shouldUninitializeCom = SUCCEEDED(comResult);
-    const HRESULT result = URLDownloadToFileW(
-        nullptr,
-        wideUrl.c_str(),
-        wideOutputPath.c_str(),
-        0,
-        nullptr
-    );
-    if (shouldUninitializeCom) {
-        CoUninitialize();
+    std::string bytes;
+    for (int attempt = 1; attempt <= kDownloadAttempts; ++attempt) {
+        if (DownloadUrlOnce(url, bytes, error)) {
+            return WriteBinaryFile(outputPath, bytes, error);
+        }
+
+        if (attempt < kDownloadAttempts) {
+            Sleep(static_cast<DWORD>(attempt * 1000));
+        }
     }
 
-    if (FAILED(result)) {
-        std::ostringstream message;
-        message << "download failed: 0x" << std::hex << std::uppercase << result;
-        error = message.str();
-        return false;
-    }
-
-    return true;
+    error = "download failed after " + std::to_string(kDownloadAttempts) + " attempts: " + error;
+    return false;
 }
 
 bool IsGitHubContentsApiUrl(const std::string& url) {
