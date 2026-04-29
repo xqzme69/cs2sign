@@ -972,6 +972,13 @@ struct KnownOffsetPattern {
     size_t instructionLength;
 };
 
+struct BuildKnownOffset {
+    std::uint32_t buildNumber;
+    std::string module;
+    std::string name;
+    std::uint32_t rva;
+};
+
 std::optional<std::uint32_t> ResolveKnownOffset(
     const std::vector<std::uint8_t>& image,
     const KnownOffsetPattern& descriptor
@@ -1012,7 +1019,7 @@ std::vector<KnownOffsetPattern> KnownOffsetPatterns() {
         { L"client.dll", "dwEntityList", "48 89 0D ? ? ? ? E9 ? ? ? ? CC", CaptureMode::RipRelative, 3, 7 },
         { L"client.dll", "dwGameEntitySystem", "48 8B 1D ? ? ? ? 48 89 1D ? ? ? ? 4C 63 B3", CaptureMode::RipRelative, 3, 7 },
         { L"client.dll", "dwGameEntitySystem_highestEntityIndex", "FF 81 ? ? ? ? 48 85 D2", CaptureMode::U32Immediate, 2, 0 },
-        { L"client.dll", "dwGameRules", "48 8D 05 ? ? ? ? 48 89 06 48 8D 4E 44", CaptureMode::RipRelative, 3, 7 },
+        { L"client.dll", "dwGameRules", "F6 C1 01 0F 85 ? ? ? ? 4C 8B 05 ? ? ? ? 4D 85", CaptureMode::RipRelative, 12, 16 },
         { L"client.dll", "dwGlobalVars", "48 89 15 ? ? ? ? 48 89 42", CaptureMode::RipRelative, 3, 7 },
         { L"client.dll", "dwGlowManager", "48 8B 05 ? ? ? ? C3 CC CC CC CC CC CC CC CC 8B 41", CaptureMode::RipRelative, 3, 7 },
         { L"client.dll", "dwLocalPlayerController", "48 8B 05 ? ? ? ? 41 89 BE", CaptureMode::RipRelative, 3, 7 },
@@ -1027,8 +1034,8 @@ std::vector<KnownOffsetPattern> KnownOffsetPatterns() {
         { L"engine2.dll", "dwNetworkGameClient", "48 89 3D ? ? ? ? FF 87", CaptureMode::RipRelative, 3, 7 },
         { L"engine2.dll", "dwNetworkGameClient_clientTickCount", "8B 81 ? ? ? ? C3 CC CC CC CC CC CC CC CC 8B 81 ? ? ? ? C3 CC CC CC CC CC CC CC CC 83 B9", CaptureMode::U32Immediate, 2, 0 },
         { L"engine2.dll", "dwNetworkGameClient_deltaTick", "4C 8D B7 ? ? ? ? 4C 89 7C 24", CaptureMode::U32Immediate, 3, 0 },
-        { L"engine2.dll", "dwNetworkGameClient_isBackgroundMap", "0F B6 81 ? ? ? ? C3 CC CC CC CC CC CC CC 0F B6 81 ? ? ? ? C3 CC CC CC CC CC CC CC 40 53", CaptureMode::U32Immediate, 3, 0 },
-        { L"engine2.dll", "dwNetworkGameClient_localPlayer", "42 8B 94 D3 ? ? ? ? 5B 49 FF E3 32 C0 5B C3 CC CC CC CC CC CC CC 40 53", CaptureMode::U32Immediate, 4, 0 },
+        { L"engine2.dll", "dwNetworkGameClient_isBackgroundMap", "0F B6 81 ? ? ? ? C3 CC CC CC CC CC CC CC CC 0F B6 81 ? ? ? ? C3 CC CC CC CC CC CC CC CC 40 53", CaptureMode::U32Immediate, 3, 0 },
+        { L"engine2.dll", "dwNetworkGameClient_localPlayer", "42 8B 94 D3 ? ? ? ? 5B 49 FF E3 32 C0 5B C3 CC CC CC CC CC CC CC CC 40 53", CaptureMode::U32Immediate, 4, 0 },
         { L"engine2.dll", "dwNetworkGameClient_maxClients", "8B 81 ? ? ? ? C3 ? ? ? ? ? ? ? ? ? 8B 81 ? ? ? ? C3 ? ? ? ? ? ? ? ? ? 8B 81", CaptureMode::U32Immediate, 2, 0 },
         { L"engine2.dll", "dwNetworkGameClient_serverTickCount", "8B 81 ? ? ? ? C3 CC CC CC CC CC CC CC CC 83 B9", CaptureMode::U32Immediate, 2, 0 },
         { L"engine2.dll", "dwNetworkGameClient_signOnState", "44 8B 81 ? ? ? ? 48 8D 0D", CaptureMode::U32Immediate, 3, 0 },
@@ -1038,6 +1045,17 @@ std::vector<KnownOffsetPattern> KnownOffsetPatterns() {
         { L"matchmaking.dll", "dwGameTypes", "48 8D 0D ? ? ? ? FF 90", CaptureMode::RipRelative, 3, 7 },
         { L"soundsystem.dll", "dwSoundSystem", "48 8D 05 ? ? ? ? C3 CC CC CC CC CC CC CC CC 48 89 15", CaptureMode::RipRelative, 3, 7 },
         { L"soundsystem.dll", "dwSoundSystem_engineViewData", "0F 11 47 ? 0F 10 4E ? 0F 11 8F", CaptureMode::U8Immediate, 3, 0 },
+    };
+}
+
+std::vector<BuildKnownOffset> BuildKnownOffsets() {
+    return {
+        { 14156, "client.dll", "dwGameRules", 0x2328E38 },
+        { 14156, "client.dll", "dwSensitivity", 0x2326748 },
+        { 14156, "engine2.dll", "dwNetworkGameClient_clientTickCount", 0x378 },
+        { 14156, "engine2.dll", "dwNetworkGameClient_isBackgroundMap", 0x2C141F },
+        { 14156, "engine2.dll", "dwNetworkGameClient_localPlayer", 0xF8 },
+        { 14156, "engine2.dll", "dwNetworkGameClient_serverTickCount", 0x24C },
     };
 }
 
@@ -1077,6 +1095,40 @@ void AddDerivedOffsets(
         if (base && addend) {
             offsets.push_back({ "client.dll", "dwLocalPlayerPawn", true, *base + *addend, "" });
         }
+    }
+}
+
+std::optional<std::uint32_t> FindKnownOffsetRva(
+    const std::vector<KnownOffsetInfo>& offsets,
+    const std::string& module,
+    const std::string& name
+) {
+    for (const KnownOffsetInfo& offset : offsets) {
+        if (offset.found && offset.module == module && offset.name == name) {
+            return offset.rva;
+        }
+    }
+    return std::nullopt;
+}
+
+void ApplyBuildKnownOffsets(std::vector<KnownOffsetInfo>& offsets, std::uint32_t buildNumber) {
+    for (const BuildKnownOffset& knownOffset : BuildKnownOffsets()) {
+        if (knownOffset.buildNumber != buildNumber) {
+            continue;
+        }
+
+        auto offsetIt = std::find_if(offsets.begin(), offsets.end(), [&](const KnownOffsetInfo& offset) {
+            return offset.module == knownOffset.module && offset.name == knownOffset.name;
+        });
+
+        if (offsetIt == offsets.end()) {
+            offsets.push_back({ knownOffset.module, knownOffset.name, true, knownOffset.rva, "" });
+            continue;
+        }
+
+        offsetIt->found = true;
+        offsetIt->rva = knownOffset.rva;
+        offsetIt->error.clear();
     }
 }
 
@@ -1192,7 +1244,19 @@ DumperStatus DumpKnownOffsets(
         return status;
     }
 
-    const std::vector<KnownOffsetInfo> offsets = ReadKnownOffsets(process);
+    std::vector<KnownOffsetInfo> offsets = ReadKnownOffsets(process);
+
+    if (const auto buildNumberRva = FindKnownOffsetRva(offsets, "engine2.dll", "dwBuildNumber")) {
+        ProcessModule engineModule{};
+        if (process.GetModuleInfo(L"engine2.dll", engineModule)) {
+            std::uint32_t value = 0;
+            if (process.Read(engineModule.base + *buildNumberRva, value)) {
+                buildNumber = value;
+                ApplyBuildKnownOffsets(offsets, value);
+            }
+        }
+    }
+
     WriteOffsetsJson(outputDirectory / "offsets.json", offsets);
     WriteOffsetsHpp(outputDirectory / "offsets.hpp", offsets);
 
@@ -1200,15 +1264,6 @@ DumperStatus DumpKnownOffsets(
     for (const KnownOffsetInfo& offset : offsets) {
         if (offset.found) {
             ++foundCount;
-            if (offset.module == "engine2.dll" && offset.name == "dwBuildNumber") {
-                ProcessModule engineModule{};
-                if (process.GetModuleInfo(L"engine2.dll", engineModule)) {
-                    std::uint32_t value = 0;
-                    if (process.Read(engineModule.base + offset.rva, value)) {
-                        buildNumber = value;
-                    }
-                }
-            }
         }
     }
 
