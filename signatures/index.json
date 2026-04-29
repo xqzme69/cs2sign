@@ -1,35 +1,35 @@
 {
-    "schema_version":  1,
-    "project":  "cs2sign",
-    "source":  "github",
-    "build":  "cs2-current",
-    "generated_at":  "2026-04-28T20:41:02Z",
-    "base_url":  "https://raw.githubusercontent.com/xqzme69/cs2sign/main/signatures/",
-    "files":  [
-                  {
-                      "name":  "client_signatures.json",
-                      "sha256":  "d90325178a7a1dc59df415e6a9ae36bcc394f1b870834f180fcd44cbcd847e71",
-                      "size":  50191
-                  },
-                  {
-                      "name":  "engine2_signatures.json",
-                      "sha256":  "11e0e7f3c17c0814cbb581f35dae2da0bd344dad4c5f8303b9b0b53bbed21c3e",
-                      "size":  42644
-                  },
-                  {
-                      "name":  "inputsystem_signatures.json",
-                      "sha256":  "0bdb2a3187e05a87f2c662dd6312691074d5a86e6e5c87a369e1cd8d886856e2",
-                      "size":  5688
-                  },
-                  {
-                      "name":  "schemasystem_signatures.json",
-                      "sha256":  "caf97d36e0678b384741593be4aaaaa10e5f7f29cb87b1ae09a2f6ba97c4c82d",
-                      "size":  7073
-                  },
-                  {
-                      "name":  "soundsystem_signatures.json",
-                      "sha256":  "c79b757f490843eba8d180b69ccd31249c43b1cd01bd2a72da5a1489ed84df74",
-                      "size":  30281
-                  }
-              ]
+  "schema_version": 1,
+  "project": "cs2sign",
+  "source": "github",
+  "build": "14156",
+  "generated_at": "2026-04-29T17:48:16Z",
+  "base_url": "https://raw.githubusercontent.com/xqzme69/cs2sign/main/signatures/",
+  "files": [
+    {
+      "name": "client_signatures.json",
+      "sha256": "77259b37331fd8fd6b879f0e62bf30df5ad97017c6e0062f7a3644040c1559bc",
+      "size": 28330
+    },
+    {
+      "name": "engine2_signatures.json",
+      "sha256": "22a5ab013245ca8e5d1639dde16f5411ac491fd83ed922324d6a7e43743ca55a",
+      "size": 65277
+    },
+    {
+      "name": "inputsystem_signatures.json",
+      "sha256": "4a2056a35c6ef905f610ad022eb50de43997feed8780f5533a39400adb419078",
+      "size": 8091
+    },
+    {
+      "name": "schemasystem_signatures.json",
+      "sha256": "b62c2e9961a7d003cb786985500deece32e9c0a31034beccf28ddc63f6fd2de5",
+      "size": 10223
+    },
+    {
+      "name": "soundsystem_signatures.json",
+      "sha256": "824d1bdc1c0b58bab12222475fa3aa00286a8bbe0b6a515e9efd6db1441b5608",
+      "size": 45797
+    }
+  ]
 }

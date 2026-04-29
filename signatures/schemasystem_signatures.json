@@ -4,7 +4,7 @@
     "ida_version": "9.2",
     "module": "schemasystem",
     "image_base": "0x180000000",
-    "timestamp": "2026-04-28 18:38:41",
+    "timestamp": "2026-04-29 19:41:51",
     "total_functions": 9,
     "signatures_generated": 8,
     "failed": 1,
@@ -13,7 +13,7 @@
       "not_unique": 1,
       "duplicate_name": 0
     },
-    "elapsed_seconds": 0.04,
+    "elapsed_seconds": 0.05,
     "config": {
       "only_named": true,
       "min_signature_length": 6,
@@ -41,12 +41,20 @@
   },
   "DialogFunc": {
     "pattern": "40 53 48 83 EC 60 48 8B D9 81 EA 10 01 00 00",
+    "ida_pattern": "40 53 48 83 EC 60 48 8B D9 81 EA 10 01 00 00",
+    "code_style_pattern": "\\x40\\x53\\x48\\x83\\xEC\\x60\\x48\\x8B\\xD9\\x81\\xEA\\x10\\x01\\x00\\x00",
     "bytes": "\\x40\\x53\\x48\\x83\\xEC\\x60\\x48\\x8B\\xD9\\x81\\xEA\\x10\\x01\\x00\\x00",
     "mask": "xxxxxxxxxxxxxxx",
     "module": "schemasystem",
     "raw_name": "DialogFunc",
     "display_name": "DialogFunc",
     "category": "game",
+    "importance": "required",
+    "required": true,
+    "status": "generated",
+    "source": "ida_plugin",
+    "source_project": "cs2sign",
+    "source_count": 1,
     "rva": "0x5f50",
     "pattern_rva": "0x5f50",
     "pattern_offset": 0,
@@ -60,16 +68,25 @@
     "wildcard_ratio": 0.0,
     "quality_notes": [
       "short_unique_core"
-    ]
+    ],
+    "confidence": 92
   },
   "BinaryProperties_GetValue": {
     "pattern": "83 F9 07 0F 87 ? ? ? ? 48 63 C1",
+    "ida_pattern": "83 F9 07 0F 87 ? ? ? ? 48 63 C1",
+    "code_style_pattern": "\\x83\\xF9\\x07\\x0F\\x87\\x2A\\x2A\\x2A\\x2A\\x48\\x63\\xC1",
     "bytes": "\\x83\\xF9\\x07\\x0F\\x87\\x00\\x00\\x00\\x00\\x48\\x63\\xC1",
     "mask": "xxxxx????xxx",
     "module": "schemasystem",
     "raw_name": "BinaryProperties_GetValue",
     "display_name": "BinaryProperties_GetValue",
     "category": "game",
+    "importance": "required",
+    "required": true,
+    "status": "generated",
+    "source": "ida_plugin",
+    "source_project": "cs2sign",
+    "source_count": 1,
     "rva": "0x264a0",
     "pattern_rva": "0x264a0",
     "pattern_offset": 0,
@@ -84,16 +101,25 @@
     "quality_notes": [
       "short_unique_core",
       "many_wildcards"
-    ]
+    ],
+    "confidence": 84
   },
   "ExtractModuleMetadata": {
     "pattern": "48 89 5C 24 08 57 48 83 EC 20 65 48 8B 04 25 ? ? ? ?",
+    "ida_pattern": "48 89 5C 24 08 57 48 83 EC 20 65 48 8B 04 25 ? ? ? ?",
+    "code_style_pattern": "\\x48\\x89\\x5C\\x24\\x08\\x57\\x48\\x83\\xEC\\x20\\x65\\x48\\x8B\\x04\\x25\\x2A\\x2A\\x2A\\x2A",
     "bytes": "\\x48\\x89\\x5C\\x24\\x08\\x57\\x48\\x83\\xEC\\x20\\x65\\x48\\x8B\\x04\\x25\\x00\\x00\\x00\\x00",
     "mask": "xxxxxxxxxxxxxxx????",
     "module": "schemasystem",
     "raw_name": "ExtractModuleMetadata",
     "display_name": "ExtractModuleMetadata",
     "category": "module",
+    "importance": "required",
+    "required": true,
+    "status": "generated",
+    "source": "ida_plugin",
+    "source_project": "cs2sign",
+    "source_count": 1,
     "rva": "0x268f0",
     "pattern_rva": "0x268f0",
     "pattern_offset": 0,
@@ -107,16 +133,25 @@
     "wildcard_ratio": 0.211,
     "quality_notes": [
       "short_unique_core"
-    ]
+    ],
+    "confidence": 92
   },
   "CreateInterface": {
     "pattern": "4C 8B 0D ? ? ? ? 4C 8B D2 4C 8B D9",
+    "ida_pattern": "4C 8B 0D ? ? ? ? 4C 8B D2 4C 8B D9",
+    "code_style_pattern": "\\x4C\\x8B\\x0D\\x2A\\x2A\\x2A\\x2A\\x4C\\x8B\\xD2\\x4C\\x8B\\xD9",
     "bytes": "\\x4C\\x8B\\x0D\\x00\\x00\\x00\\x00\\x4C\\x8B\\xD2\\x4C\\x8B\\xD9",
     "mask": "xxx????xxxxxx",
     "module": "schemasystem",
     "raw_name": "CreateInterface",
     "display_name": "CreateInterface",
     "category": "module",
+    "importance": "required",
+    "required": true,
+    "status": "generated",
+    "source": "ida_plugin",
+    "source_project": "cs2sign",
+    "source_count": 1,
     "rva": "0x35d60",
     "pattern_rva": "0x35d60",
     "pattern_offset": 0,
@@ -131,16 +166,25 @@
     "quality_notes": [
       "short_unique_core",
       "many_wildcards"
-    ]
+    ],
+    "confidence": 84
   },
   "InstallSchemaBindings": {
     "pattern": "40 53 48 83 EC 20 48 8B DA 48 8B D1 48 8D 0D ? ? ? ?",
+    "ida_pattern": "40 53 48 83 EC 20 48 8B DA 48 8B D1 48 8D 0D ? ? ? ?",
+    "code_style_pattern": "\\x40\\x53\\x48\\x83\\xEC\\x20\\x48\\x8B\\xDA\\x48\\x8B\\xD1\\x48\\x8D\\x0D\\x2A\\x2A\\x2A\\x2A",
     "bytes": "\\x40\\x53\\x48\\x83\\xEC\\x20\\x48\\x8B\\xDA\\x48\\x8B\\xD1\\x48\\x8D\\x0D\\x00\\x00\\x00\\x00",
     "mask": "xxxxxxxxxxxxxxx????",
     "module": "schemasystem",
     "raw_name": "InstallSchemaBindings",
     "display_name": "InstallSchemaBindings",
     "category": "module",
+    "importance": "required",
+    "required": true,
+    "status": "generated",
+    "source": "ida_plugin",
+    "source_project": "cs2sign",
+    "source_count": 1,
     "rva": "0x375d0",
     "pattern_rva": "0x375d0",
     "pattern_offset": 0,
@@ -152,16 +196,25 @@
     "fixed_bytes": 15,
     "wildcards": 4,
     "wildcard_ratio": 0.211,
-    "quality_notes": []
+    "quality_notes": [],
+    "confidence": 100
   },
   "GetResourceManifests": {
     "pattern": "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 48 89 7C 24 20 41 54 41 56 41 57 48 83 EC 20 48 8B 3D ? ? ? ?",
+    "ida_pattern": "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 48 89 7C 24 20 41 54 41 56 41 57 48 83 EC 20 48 8B 3D ? ? ? ?",
+    "code_style_pattern": "\\x48\\x89\\x5C\\x24\\x08\\x48\\x89\\x6C\\x24\\x10\\x48\\x89\\x74\\x24\\x18\\x48\\x89\\x7C\\x24\\x20\\x41\\x54\\x41\\x56\\x41\\x57\\x48\\x83\\xEC\\x20\\x48\\x8B\\x3D\\x2A\\x2A\\x2A\\x2A",
     "bytes": "\\x48\\x89\\x5C\\x24\\x08\\x48\\x89\\x6C\\x24\\x10\\x48\\x89\\x74\\x24\\x18\\x48\\x89\\x7C\\x24\\x20\\x41\\x54\\x41\\x56\\x41\\x57\\x48\\x83\\xEC\\x20\\x48\\x8B\\x3D\\x00\\x00\\x00\\x00",
     "mask": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx????",
     "module": "schemasystem",
     "raw_name": "GetResourceManifests",
     "display_name": "GetResourceManifests",
     "category": "module",
+    "importance": "required",
+    "required": true,
+    "status": "generated",
+    "source": "ida_plugin",
+    "source_project": "cs2sign",
+    "source_count": 1,
     "rva": "0x37a80",
     "pattern_rva": "0x37a80",
     "pattern_offset": 0,
@@ -173,16 +226,25 @@
     "fixed_bytes": 33,
     "wildcards": 4,
     "wildcard_ratio": 0.108,
-    "quality_notes": []
+    "quality_notes": [],
+    "confidence": 100
   },
   "DllEntryPoint": {
     "pattern": "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 49 8B F8 8B DA",
+    "ida_pattern": "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 49 8B F8 8B DA",
+    "code_style_pattern": "\\x48\\x89\\x5C\\x24\\x08\\x48\\x89\\x74\\x24\\x10\\x57\\x48\\x83\\xEC\\x20\\x49\\x8B\\xF8\\x8B\\xDA",
     "bytes": "\\x48\\x89\\x5C\\x24\\x08\\x48\\x89\\x74\\x24\\x10\\x57\\x48\\x83\\xEC\\x20\\x49\\x8B\\xF8\\x8B\\xDA",
     "mask": "xxxxxxxxxxxxxxxxxxxx",
     "module": "schemasystem",
     "raw_name": "DllEntryPoint",
     "display_name": "DllEntryPoint",
     "category": "module",
+    "importance": "required",
+    "required": true,
+    "status": "generated",
+    "source": "ida_plugin",
+    "source_project": "cs2sign",
+    "source_count": 1,
     "rva": "0x383bc",
     "pattern_rva": "0x383bc",
     "pattern_offset": 0,
@@ -194,16 +256,25 @@
     "fixed_bytes": 20,
     "wildcards": 0,
     "wildcard_ratio": 0.0,
-    "quality_notes": []
+    "quality_notes": [],
+    "confidence": 100
   },
   "TlsCallback_0": {
     "pattern": "83 FA 02 75 ? 48 89 5C 24 08 57 48 83 EC 20",
+    "ida_pattern": "83 FA 02 75 ? 48 89 5C 24 08 57 48 83 EC 20",
+    "code_style_pattern": "\\x83\\xFA\\x02\\x75\\x2A\\x48\\x89\\x5C\\x24\\x08\\x57\\x48\\x83\\xEC\\x20",
     "bytes": "\\x83\\xFA\\x02\\x75\\x00\\x48\\x89\\x5C\\x24\\x08\\x57\\x48\\x83\\xEC\\x20",
     "mask": "xxxx?xxxxxxxxxx",
     "module": "schemasystem",
     "raw_name": "TlsCallback_0",
     "display_name": "TlsCallback_0",
     "category": "module",
+    "importance": "required",
+    "required": true,
+    "status": "generated",
+    "source": "ida_plugin",
+    "source_project": "cs2sign",
+    "source_count": 1,
     "rva": "0x38460",
     "pattern_rva": "0x38460",
     "pattern_offset": 0,
@@ -217,6 +288,7 @@
     "wildcard_ratio": 0.067,
     "quality_notes": [
       "short_unique_core"
-    ]
+    ],
+    "confidence": 92
   }
 }
