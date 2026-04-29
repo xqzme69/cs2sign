@@ -6,7 +6,9 @@ param(
     [string]$Platform = "x64",
 
     [ValidateSet("scanner")]
-    [string]$Target = "scanner"
+    [string]$Target = "scanner",
+
+    [string]$PlatformToolset = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -61,7 +63,12 @@ if ($Target -eq "scanner") {
 }
 
 foreach ($Project in $Projects) {
-    & $MSBuild $Project /p:Configuration=$Configuration /p:Platform=$Platform /m
+    $Arguments = @($Project, "/p:Configuration=$Configuration", "/p:Platform=$Platform", "/m")
+    if ($PlatformToolset) {
+        $Arguments += "/p:PlatformToolset=$PlatformToolset"
+    }
+
+    & $MSBuild @Arguments
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }

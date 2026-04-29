@@ -17,4 +17,4 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: .\scripts\build.ps1 -Configuration Release -Platform x64 -Target scanner
+        run: .\scripts\build.ps1 -Configuration Release -Platform x64 -Target scanner -PlatformToolset v143
