@@ -1,11 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
-#include <map>
-#include <fstream>
-#include <sstream>
-#include <cstdint>
 
 struct SignatureEntry {
     std::string name;
@@ -29,11 +26,4 @@ struct SignatureEntry {
 class JSONParser {
 public:
     static bool LoadSignatures(const std::string& filepath, std::vector<SignatureEntry>& out, std::string& error);
-
-private:
-    static std::string Trim(const std::string& s);
-    static std::string UnescapeString(const std::string& s);
-    static bool ParseString(const std::string& json, size_t& pos, std::string& out);
-    static bool SkipWhitespace(const std::string& json, size_t& pos);
-    static bool ExpectChar(const std::string& json, size_t& pos, char c);
 };

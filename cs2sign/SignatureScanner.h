@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DumpUtils.h"
 #include "ProcessMemoryReader.h"
 #include <vector>
 #include <string>
@@ -13,6 +14,7 @@ struct Signature {
     std::string name;
     std::string pattern;
     std::string mask;
+    std::vector<PatternByte> compiledPattern;
     std::string module;     // target module (e.g. "client")
     std::string rva;        // original RVA from IDA
     std::string category;   // game/module/library/runtime/etc.
@@ -37,7 +39,7 @@ public:
     SignatureScanner(ProcessMemoryReader& memory);
     ~SignatureScanner();
 
-    // Add signature from raw bytes + mask (legacy)
+    // Add signature from raw bytes + mask.
     void AddSignature(const std::string& name, const std::string& pattern, const std::string& mask, intptr_t offset = 0);
     void AddSignature(const std::string& name, const char* pattern, size_t patternLen, const std::string& mask, intptr_t offset = 0);
 
@@ -84,10 +86,9 @@ private:
     void RecordMissingSignature(Signature& signature, const SignatureScanOutcome& outcome);
     void WriteResultsJSON(std::ofstream& file);
 
-    uintptr_t ScanPattern(uintptr_t start, size_t size, const std::string& pattern, const std::string& mask, std::string& error);
-    uintptr_t ScanPatternOptimized(uintptr_t start, size_t size, const std::string& pattern, const std::string& mask, std::string& error);
-    bool ComparePattern(const uint8_t* memoryBytes, const std::string& pattern, const std::string& mask, size_t length);
-    std::string EscapeJSON(const std::string& str);
+    uintptr_t ScanPattern(uintptr_t start, size_t size, const std::vector<PatternByte>& pattern, std::string& error);
+    uintptr_t ScanPatternOptimized(uintptr_t start, size_t size, const std::vector<PatternByte>& pattern, std::string& error);
+    bool ComparePattern(const uint8_t* memoryBytes, const std::vector<PatternByte>& pattern);
 
     ProcessMemoryReader& m_memory;
     std::vector<Signature> m_signatures;

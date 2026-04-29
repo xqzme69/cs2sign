@@ -1,8 +1,8 @@
 #include <windows.h>
 
 #include "BadApplePlayer.h"
-#include "CS2Signatures.h"
 #include "Console.h"
+#include "DumpUtils.h"
 #include "ExternalDumpers.h"
 #include "ProcessMemoryReader.h"
 #include "RemoteSignatureProvider.h"
@@ -10,16 +10,15 @@
 #include "SignatureLoader.h"
 #include "SignatureScanner.h"
 
-#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <vector>
 
 namespace {
+constexpr const char* kCs2SignVersion = "0.1.7";
 constexpr const char* kDefaultSignatureInputPath = "signatures.json";
 constexpr const char* kDefaultRemoteSignatureManifestUrl =
     "https://api.github.com/repos/xqzme69/cs2sign/contents/signatures/index.json?ref=main";
@@ -34,7 +33,6 @@ struct RuntimeOptions {
     std::string signatureInputPath = kDefaultSignatureInputPath;
     std::string remoteSignatureManifestUrl = kDefaultRemoteSignatureManifestUrl;
     SignatureSourceMode signatureSourceMode = SignatureSourceMode::RemoteGitHub;
-    bool shouldLoadBuiltInSignatures = false;
     bool shouldRunSignatureScan = true;
     bool shouldPauseBeforeExit = true;
     bool shouldGenerateSdk = false;
@@ -45,6 +43,7 @@ struct RuntimeOptions {
 struct CommandLineParseResult {
     RuntimeOptions options;
     bool shouldShowHelp = false;
+    bool shouldShowVersion = false;
     bool hasError = false;
     std::string errorMessage;
 };
@@ -55,8 +54,6 @@ struct SignatureLoadReport {
 };
 
 struct RunHealthReport {
-    bool usedLegacySignatures = false;
-    size_t legacySignatureCount = 0;
     size_t jsonFileCount = 0;
     int jsonSignatureCount = 0;
     size_t totalSignatureCount = 0;
@@ -140,9 +137,6 @@ void PrintUsage() {
     std::cout
         << "Usage: cs2sign.exe [signature-file-or-directory] [options]\n\n"
         << "Options:\n"
-        << "  --legacy-signatures\n"
-        << "                     Also load legacy hardcoded signatures from CS2Signatures.h.\n"
-        << "  --json-only        Compatibility alias: keep built-in signatures disabled.\n"
         << "  --remote-signatures\n"
         << "                     Download generated JSON signatures from the GitHub index (default).\n"
         << "  --remote-signatures-url <url>\n"
@@ -157,6 +151,7 @@ void PrintUsage() {
         << "  --emit-sdk         Generate SDK files from dump\\schemas.\n"
         << "  --output <dir>     Output directory for read-only dumpers (default: dump).\n"
         << "  --no-pause         Exit immediately instead of waiting for a key press.\n"
+        << "  --version          Show cs2sign version.\n"
         << "  --help             Show this help text.\n";
 }
 
@@ -172,14 +167,9 @@ CommandLineParseResult ParseCommandLine(int argc, char* argv[]) {
             return parseResult;
         }
 
-        if (argument == "--json-only") {
-            parseResult.options.shouldLoadBuiltInSignatures = false;
-            continue;
-        }
-
-        if (argument == "--legacy-signatures") {
-            parseResult.options.shouldLoadBuiltInSignatures = true;
-            continue;
+        if (argument == "--version" || argument == "-v") {
+            parseResult.shouldShowVersion = true;
+            return parseResult;
         }
 
         if (argument == "--remote-signatures") {
@@ -383,16 +373,6 @@ void PrintInteractiveMenu() {
     Console::ResetColor();
 }
 
-std::string ToLowerAscii(std::string answer) {
-    for (char& character : answer) {
-        if (character >= 'A' && character <= 'Z') {
-            character = static_cast<char>(character - 'A' + 'a');
-        }
-    }
-
-    return answer;
-}
-
 bool ConfigureConsoleOutputFromInteractiveMenu(RuntimeOptions& options) {
     PrintConsoleOutputMenu();
 
@@ -567,21 +547,6 @@ std::vector<std::string> ResolveSignatureFilesForOptions(
     return remoteResult.signatureFiles;
 }
 
-size_t LoadBuiltInSignatures(SignatureScanner& scanner, bool shouldLoadBuiltInSignatures) {
-    if (!shouldLoadBuiltInSignatures) {
-        Console::PrintInfo(L"Skipping legacy hardcoded signatures (default)");
-        return 0;
-    }
-
-    const size_t beforeCount = scanner.GetSignatures().size();
-    AddCS2Signatures(scanner);
-    const size_t loadedCount = scanner.GetSignatures().size() - beforeCount;
-    Console::PrintSuccess(
-        L"Loaded " + std::to_wstring(loadedCount) + L" legacy hardcoded signatures"
-    );
-    return loadedCount;
-}
-
 SignatureLoadReport LoadJsonSignatureFiles(
     SignatureScanner& scanner,
     const std::vector<std::string>& signatureFiles
@@ -621,10 +586,8 @@ SignatureLoadReport LoadJsonSignatureFiles(
     return report;
 }
 
-void PrintNoJsonFilesWarning(bool shouldLoadBuiltInSignatures) {
-    Console::PrintWarning(shouldLoadBuiltInSignatures
-        ? L"No *_signatures.json files found (using hardcoded only)."
-        : L"No *_signatures.json files found. Run the IDA plugin or pass --legacy-signatures.");
+void PrintNoJsonFilesWarning() {
+    Console::PrintWarning(L"No *_signatures.json files found. Run the IDA plugin or use GitHub signatures.");
 }
 
 size_t CountPatternValidationErrors(const SignatureScanner& scanner) {
@@ -700,76 +663,6 @@ size_t CountOptionalFoundSignatures(const SignatureScanner& scanner) {
     return count;
 }
 
-std::string CurrentTimestampUtc() {
-    const auto now = std::chrono::system_clock::now();
-    const std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
-    std::tm utcTime{};
-    gmtime_s(&utcTime, &nowTime);
-
-    std::ostringstream stream;
-    stream << std::put_time(&utcTime, "%Y-%m-%dT%H:%M:%SZ");
-    return stream.str();
-}
-
-std::string EscapeJson(const std::string& value) {
-    std::ostringstream escaped;
-
-    for (unsigned char character : value) {
-        switch (character) {
-            case '"': escaped << "\\\""; break;
-            case '\\': escaped << "\\\\"; break;
-            case '\b': escaped << "\\b"; break;
-            case '\f': escaped << "\\f"; break;
-            case '\n': escaped << "\\n"; break;
-            case '\r': escaped << "\\r"; break;
-            case '\t': escaped << "\\t"; break;
-            default:
-                if (character <= 0x1f) {
-                    escaped << "\\u"
-                            << std::hex << std::setw(4) << std::setfill('0')
-                            << static_cast<int>(character);
-                } else {
-                    escaped << static_cast<char>(character);
-                }
-        }
-    }
-
-    return escaped.str();
-}
-
-std::string WideToUtf8ForReport(const std::wstring& value) {
-    if (value.empty()) {
-        return {};
-    }
-
-    const int requiredLength = WideCharToMultiByte(
-        CP_UTF8,
-        0,
-        value.c_str(),
-        static_cast<int>(value.size()),
-        nullptr,
-        0,
-        nullptr,
-        nullptr
-    );
-    if (requiredLength <= 0) {
-        return {};
-    }
-
-    std::string result(static_cast<size_t>(requiredLength), '\0');
-    WideCharToMultiByte(
-        CP_UTF8,
-        0,
-        value.c_str(),
-        static_cast<int>(value.size()),
-        result.data(),
-        requiredLength,
-        nullptr,
-        nullptr
-    );
-    return result;
-}
-
 void RefreshSignatureHealth(RunHealthReport& report, const SignatureScanner& scanner) {
     report.totalSignatureCount = scanner.GetSignatures().size();
     report.foundSignatureCount = CountFoundSignatures(scanner);
@@ -837,6 +730,7 @@ void WriteUpdateReport(
 
     file << "{\n";
     file << "  \"generator\": \"cs2sign\",\n";
+    file << "  \"generator_version\": \"" << kCs2SignVersion << "\",\n";
     file << "  \"timestamp\": \"" << CurrentTimestampUtc() << "\",\n";
     file << "  \"health\": \"" << DetermineHealthStatus(report) << "\",\n";
     file << "  \"process\": {\n";
@@ -847,8 +741,6 @@ void WriteUpdateReport(
     file << "  \"signatures\": {\n";
     file << "    \"scan_ran\": " << (report.signatureScanRan ? "true" : "false") << ",\n";
     file << "    \"scan_skipped\": " << (report.signatureScanSkipped ? "true" : "false") << ",\n";
-    file << "    \"legacy_enabled\": " << (report.usedLegacySignatures ? "true" : "false") << ",\n";
-    file << "    \"legacy_loaded\": " << report.legacySignatureCount << ",\n";
     file << "    \"json_files\": " << report.jsonFileCount << ",\n";
     file << "    \"json_loaded\": " << report.jsonSignatureCount << ",\n";
     file << "    \"total\": " << report.totalSignatureCount << ",\n";
@@ -903,8 +795,8 @@ void WriteUpdateReport(
     for (size_t index = 0; index < modules.size(); ++index) {
         const ProcessModule& module = modules[index];
         file << "    {\n";
-        file << "      \"name\": \"" << EscapeJson(WideToUtf8ForReport(module.name)) << "\",\n";
-        file << "      \"path\": \"" << EscapeJson(WideToUtf8ForReport(module.path)) << "\",\n";
+        file << "      \"name\": \"" << EscapeJson(WideToUtf8(module.name)) << "\",\n";
+        file << "      \"path\": \"" << EscapeJson(WideToUtf8(module.path)) << "\",\n";
         file << "      \"base\": \"0x" << std::hex << std::uppercase << module.base << std::dec << "\",\n";
         file << "      \"size\": " << module.size << "\n";
         file << "    }" << (index + 1 == modules.size() ? "" : ",") << "\n";
@@ -1045,6 +937,11 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    if (commandLine.shouldShowVersion) {
+        std::cout << "cs2sign " << kCs2SignVersion << "\n";
+        return 0;
+    }
+
     if (commandLine.hasError) {
         std::cerr << commandLine.errorMessage << "\n\n";
         PrintUsage();
@@ -1060,7 +957,6 @@ int main(int argc, char* argv[]) {
         return ExitWithOptionalPause(0, options.shouldPauseBeforeExit);
     }
     RunHealthReport healthReport;
-    healthReport.usedLegacySignatures = options.shouldLoadBuiltInSignatures;
     healthReport.signatureScanSkipped = !options.shouldRunSignatureScan;
 
     const bool hasReadOnlyDumpWork = HasReadOnlyDumpWork(options.dumpOptions);
@@ -1113,9 +1009,6 @@ int main(int argc, char* argv[]) {
     if (options.shouldRunSignatureScan) {
         Console::PrintHeader(L"Signature Database");
 
-        healthReport.legacySignatureCount =
-            LoadBuiltInSignatures(scanner, options.shouldLoadBuiltInSignatures);
-
         const std::vector<std::string> signatureFiles =
             ResolveSignatureFilesForOptions(options, argv[0]);
         const SignatureLoadReport jsonLoadReport = LoadJsonSignatureFiles(scanner, signatureFiles);
@@ -1124,7 +1017,7 @@ int main(int argc, char* argv[]) {
         RefreshSignatureHealth(healthReport, scanner);
 
         if (jsonLoadReport.jsonFileCount == 0) {
-            PrintNoJsonFilesWarning(options.shouldLoadBuiltInSignatures);
+            PrintNoJsonFilesWarning();
         }
 
         Console::PrintInfo(L"Total signatures: " + std::to_wstring(scanner.GetSignatures().size()));

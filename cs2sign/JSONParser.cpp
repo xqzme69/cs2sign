@@ -1,249 +1,111 @@
 #include "JSONParser.h"
+
+#include "JsonReader.h"
+
 #include <algorithm>
 #include <cctype>
-#include <cstdlib>
+#include <fstream>
 #include <sstream>
+#include <utility>
 
-std::string JSONParser::Trim(const std::string& s) {
-    size_t start = s.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) return "";
-    size_t end = s.find_last_not_of(" \t\r\n");
-    return s.substr(start, end - start + 1);
-}
-
-std::string JSONParser::UnescapeString(const std::string& s) {
-    std::string result;
-    result.reserve(s.size());
-    for (size_t i = 0; i < s.size(); ++i) {
-        if (s[i] == '\\' && i + 1 < s.size()) {
-            switch (s[i + 1]) {
-                case '"':  result += '"'; i++; break;
-                case '\\': result += '\\'; i++; break;
-                case '/':  result += '/'; i++; break;
-                case 'n':  result += '\n'; i++; break;
-                case 'r':  result += '\r'; i++; break;
-                case 't':  result += '\t'; i++; break;
-                default:   result += s[i]; break;
-            }
-        } else {
-            result += s[i];
-        }
+namespace {
+bool ReadString(const JsonValue& value, std::string& result) {
+    if (value.type != JsonValue::Type::String) {
+        return false;
     }
-    return result;
-}
 
-bool JSONParser::SkipWhitespace(const std::string& json, size_t& pos) {
-    while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) {
-        pos++;
-    }
-    return pos < json.size();
-}
-
-bool JSONParser::ExpectChar(const std::string& json, size_t& pos, char c) {
-    SkipWhitespace(json, pos);
-    if (pos >= json.size() || json[pos] != c) return false;
-    pos++;
+    result = value.stringValue;
     return true;
 }
 
-bool JSONParser::ParseString(const std::string& json, size_t& pos, std::string& out) {
-    SkipWhitespace(json, pos);
-    if (pos >= json.size() || json[pos] != '"') return false;
-    pos++;
+std::string Trim(std::string value) {
+    const auto first = std::find_if_not(value.begin(), value.end(), [](unsigned char character) {
+        return std::isspace(character);
+    });
+    const auto last = std::find_if_not(value.rbegin(), value.rend(), [](unsigned char character) {
+        return std::isspace(character);
+    }).base();
 
-    std::string result;
-    while (pos < json.size() && json[pos] != '"') {
-        if (json[pos] == '\\' && pos + 1 < json.size()) {
-            result += json[pos];
-            result += json[pos + 1];
-            pos += 2;
-        } else {
-            result += json[pos];
-            pos++;
-        }
+    if (first >= last) {
+        return {};
     }
-    if (pos >= json.size()) return false;
-    pos++;
 
-    out = UnescapeString(result);
-    return true;
+    return std::string(first, last);
 }
 
-static bool SkipValue(const std::string& json, size_t& pos) {
-    while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) pos++;
-    if (pos >= json.size()) return false;
-
-    char c = json[pos];
-
-    if (c == '"') {
-        pos++;
-        while (pos < json.size() && json[pos] != '"') {
-            if (json[pos] == '\\') pos++;
-            pos++;
-        }
-        if (pos < json.size()) pos++;
-        return true;
-    }
-
-    if (c == '{') {
-        pos++;
-        int depth = 1;
-        while (pos < json.size() && depth > 0) {
-            if (json[pos] == '{') depth++;
-            else if (json[pos] == '}') depth--;
-            else if (json[pos] == '"') {
-                pos++;
-                while (pos < json.size() && json[pos] != '"') {
-                    if (json[pos] == '\\') pos++;
-                    pos++;
-                }
-            }
-            pos++;
-        }
-        return true;
-    }
-
-    if (c == '[') {
-        pos++;
-        int depth = 1;
-        while (pos < json.size() && depth > 0) {
-            if (json[pos] == '[') depth++;
-            else if (json[pos] == ']') depth--;
-            else if (json[pos] == '"') {
-                pos++;
-                while (pos < json.size() && json[pos] != '"') {
-                    if (json[pos] == '\\') pos++;
-                    pos++;
-                }
-            }
-            pos++;
-        }
-        return true;
-    }
-
-    while (pos < json.size() && json[pos] != ',' && json[pos] != '}' && json[pos] != ']'
-           && !std::isspace(static_cast<unsigned char>(json[pos]))) {
-        pos++;
-    }
-    return true;
+std::string LowerAscii(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char character) {
+        return static_cast<char>(std::tolower(character));
+    });
+    return value;
 }
 
-static bool ParseInteger(const std::string& json, size_t& pos, std::int64_t& value) {
-    while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) {
-        pos++;
+bool ReadInteger(const JsonValue& value, std::int64_t& result) {
+    if (value.type == JsonValue::Type::Number) {
+        result = value.numberValue;
+        return true;
     }
 
-    const size_t numberStart = pos;
-    if (pos < json.size() && (json[pos] == '-' || json[pos] == '+')) {
-        pos++;
-    }
-
-    bool hasDigit = false;
-    while (pos < json.size() && std::isdigit(static_cast<unsigned char>(json[pos]))) {
-        hasDigit = true;
-        pos++;
-    }
-
-    if (!hasDigit) {
-        pos = numberStart;
+    if (value.type != JsonValue::Type::String) {
         return false;
     }
 
     try {
-        value = std::stoll(json.substr(numberStart, pos - numberStart), nullptr, 10);
-        return true;
-    } catch (...) {
-        pos = numberStart;
-        return false;
-    }
-}
-
-static bool ParseIntegerValue(const std::string& json, size_t& pos, std::int64_t& value) {
-    if (ParseInteger(json, pos, value)) {
-        return true;
-    }
-
-    while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) {
-        pos++;
-    }
-
-    if (pos >= json.size() || json[pos] != '"') {
-        return false;
-    }
-
-    pos++;
-    const size_t valueStart = pos;
-    while (pos < json.size() && json[pos] != '"') {
-        pos++;
-    }
-    if (pos >= json.size()) {
-        return false;
-    }
-
-    const std::string stringValue = json.substr(valueStart, pos - valueStart);
-    pos++;
-
-    try {
-        value = std::stoll(stringValue, nullptr, 0);
+        result = std::stoll(Trim(value.stringValue), nullptr, 0);
         return true;
     } catch (...) {
         return false;
     }
 }
 
-static bool ParseBoolValue(const std::string& json, size_t& pos, bool& value) {
-    while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) {
-        pos++;
-    }
-
-    if (json.compare(pos, 4, "true") == 0) {
-        pos += 4;
-        value = true;
+bool ReadBool(const JsonValue& value, bool& result) {
+    if (value.type == JsonValue::Type::Bool) {
+        result = value.boolValue;
         return true;
     }
 
-    if (json.compare(pos, 5, "false") == 0) {
-        pos += 5;
-        value = false;
+    if (value.type != JsonValue::Type::String) {
+        return false;
+    }
+
+    const std::string normalized = LowerAscii(Trim(value.stringValue));
+    if (normalized == "true" || normalized == "1" || normalized == "yes") {
+        result = true;
+        return true;
+    }
+    if (normalized == "false" || normalized == "0" || normalized == "no") {
+        result = false;
         return true;
     }
 
-    const size_t originalPosition = pos;
-    if (pos < json.size() && json[pos] == '"') {
-        pos++;
-        const size_t valueStart = pos;
-        while (pos < json.size() && json[pos] != '"') {
-            pos++;
-        }
-        if (pos < json.size()) {
-            std::string normalized = json.substr(valueStart, pos - valueStart);
-            normalized.erase(normalized.begin(), std::find_if(normalized.begin(), normalized.end(), [](unsigned char ch) {
-                return !std::isspace(ch);
-            }));
-            normalized.erase(std::find_if(normalized.rbegin(), normalized.rend(), [](unsigned char ch) {
-                return !std::isspace(ch);
-            }).base(), normalized.end());
-            std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch) {
-                return static_cast<char>(std::tolower(ch));
-            });
-            pos++;
-
-            if (normalized == "true" || normalized == "1" || normalized == "yes") {
-                value = true;
-                return true;
-            }
-            if (normalized == "false" || normalized == "0" || normalized == "no") {
-                value = false;
-                return true;
-            }
-        }
-    }
-
-    pos = originalPosition;
     return false;
 }
 
-static bool ConvertCodeStylePatternToIda(const std::string& codeStylePattern, std::string& idaPattern) {
+bool IsPatternField(const std::string& key) {
+    return key == "pattern" ||
+           key == "ida_pattern" ||
+           key == "idaPattern" ||
+           key == "ida_style" ||
+           key == "idaStyle" ||
+           key == "code_style_pattern" ||
+           key == "codeStylePattern" ||
+           key == "mask";
+}
+
+bool IsTextField(const std::string& key) {
+    return key == "module" ||
+           key == "rva" ||
+           key == "category" ||
+           key == "quality" ||
+           key == "importance" ||
+           key == "source" ||
+           key == "source_project" ||
+           key == "sourceProject" ||
+           key == "source_url" ||
+           key == "sourceUrl";
+}
+
+bool ConvertCodeStylePatternToIda(const std::string& codeStylePattern, std::string& idaPattern) {
     std::vector<std::string> tokens;
 
     for (size_t index = 0; index < codeStylePattern.size();) {
@@ -264,8 +126,8 @@ static bool ConvertCodeStylePatternToIda(const std::string& codeStylePattern, st
             std::isxdigit(static_cast<unsigned char>(codeStylePattern[index + 2])) &&
             std::isxdigit(static_cast<unsigned char>(codeStylePattern[index + 3]))) {
             std::string byteToken = codeStylePattern.substr(index + 2, 2);
-            std::transform(byteToken.begin(), byteToken.end(), byteToken.begin(), [](unsigned char ch) {
-                return static_cast<char>(std::toupper(ch));
+            std::transform(byteToken.begin(), byteToken.end(), byteToken.begin(), [](unsigned char character) {
+                return static_cast<char>(std::toupper(character));
             });
             tokens.push_back(byteToken == "2A" ? "?" : byteToken);
             index += 4;
@@ -291,7 +153,7 @@ static bool ConvertCodeStylePatternToIda(const std::string& codeStylePattern, st
     return true;
 }
 
-static bool ConvertMaskedPatternToIda(
+bool ConvertMaskedPatternToIda(
     const std::string& patternText,
     const std::string& maskText,
     std::string& idaPattern
@@ -320,8 +182,8 @@ static bool ConvertMaskedPatternToIda(
         }
 
         std::string byteToken = patternTokens[index];
-        std::transform(byteToken.begin(), byteToken.end(), byteToken.begin(), [](unsigned char ch) {
-            return static_cast<char>(std::toupper(ch));
+        std::transform(byteToken.begin(), byteToken.end(), byteToken.begin(), [](unsigned char character) {
+            return static_cast<char>(std::toupper(character));
         });
         result << byteToken;
     }
@@ -330,162 +192,152 @@ static bool ConvertMaskedPatternToIda(
     return true;
 }
 
-bool JSONParser::LoadSignatures(const std::string& filepath, std::vector<SignatureEntry>& out, std::string& error) {
+void ApplyStringField(SignatureEntry& entry, const std::string& key, const std::string& value) {
+    if (key == "module") entry.module = value;
+    else if (key == "rva") entry.rva = value;
+    else if (key == "category") entry.category = value;
+    else if (key == "quality") entry.quality = value;
+    else if (key == "importance") entry.importance = value;
+    else if (key == "source") entry.source = value;
+    else if (key == "source_project" || key == "sourceProject") entry.sourceProject = value;
+    else if (key == "source_url" || key == "sourceUrl") entry.sourceUrl = value;
+}
+
+void ApplyPatternField(
+    SignatureEntry& entry,
+    const std::string& key,
+    const std::string& value,
+    int& patternPriority,
+    std::string& maskValue
+) {
+    if (key == "pattern") {
+        if (patternPriority <= 1) {
+            entry.pattern = value;
+            patternPriority = 1;
+        }
+        return;
+    }
+
+    if (key == "ida_pattern" || key == "idaPattern" || key == "ida_style" || key == "idaStyle") {
+        if (patternPriority <= 3) {
+            entry.pattern = value;
+            patternPriority = 3;
+        }
+        return;
+    }
+
+    if (key == "code_style_pattern" || key == "codeStylePattern") {
+        std::string convertedPattern;
+        if (patternPriority <= 2 && ConvertCodeStylePatternToIda(value, convertedPattern)) {
+            entry.pattern = convertedPattern;
+            patternPriority = 2;
+        }
+        return;
+    }
+
+    if (key == "mask") {
+        maskValue = value;
+    }
+}
+
+void ApplyNumberField(SignatureEntry& entry, const std::string& key, std::int64_t value) {
+    if (key == "length") {
+        entry.length = static_cast<int>(value);
+    } else if (key == "confidence") {
+        entry.confidence = static_cast<int>(value);
+    } else if (key == "source_count" || key == "sourceCount") {
+        entry.sourceCount = static_cast<int>(value);
+    } else if (key == "address_offset" || key == "offset") {
+        entry.addressOffset = value;
+    }
+}
+}
+
+bool JSONParser::LoadSignatures(
+    const std::string& filepath,
+    std::vector<SignatureEntry>& out,
+    std::string& error
+) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
         error = "Cannot open file: " + filepath;
         return false;
     }
 
-    std::stringstream ss;
-    ss << file.rdbuf();
-    std::string json = ss.str();
-    file.close();
+    std::stringstream stream;
+    stream << file.rdbuf();
+    const std::string jsonText = stream.str();
 
-    if (json.empty()) {
+    if (jsonText.empty()) {
         error = "Empty file";
         return false;
     }
 
-    size_t pos = 0;
-
-    if (!ExpectChar(json, pos, '{')) {
-        error = "Expected '{' at start of JSON";
+    JsonValue root;
+    JsonReader reader(jsonText);
+    if (!reader.Parse(root, error)) {
         return false;
     }
 
-    while (true) {
-        SkipWhitespace(json, pos);
-        if (pos >= json.size()) break;
-        if (json[pos] == '}') { pos++; break; }
+    if (root.type != JsonValue::Type::Object) {
+        error = "Expected root object";
+        return false;
+    }
 
-        if (json[pos] == ',') {
-            pos++;
-            SkipWhitespace(json, pos);
+    for (const auto& [name, value] : root.objectValue) {
+        if (value.type != JsonValue::Type::Object) {
+            continue;
         }
 
-        if (json[pos] == '}') { pos++; break; }
+        SignatureEntry entry{};
+        entry.name = name;
+        entry.required = true;
 
-        std::string key;
-        if (!ParseString(json, pos, key)) {
-            error = "Expected string key at position " + std::to_string(pos);
-            return false;
-        }
+        int patternPriority = 0;
+        std::string maskValue;
 
-        if (!ExpectChar(json, pos, ':')) {
-            error = "Expected ':' after key at position " + std::to_string(pos);
-            return false;
-        }
+        for (const auto& [key, field] : value.objectValue) {
+            std::string stringValue;
+            if (ReadString(field, stringValue)) {
+                if (IsPatternField(key)) {
+                    ApplyPatternField(entry, key, stringValue, patternPriority, maskValue);
+                    continue;
+                }
 
-        SkipWhitespace(json, pos);
-
-        if (pos < json.size() && json[pos] == '{') {
-            pos++;
-
-            SignatureEntry entry;
-            entry.name = key;
-            entry.addressOffset = 0;
-            entry.confidence = 0;
-            entry.sourceCount = 0;
-            entry.length = 0;
-            entry.required = true;
-            entry.hasRequiredFlag = false;
-            int patternPriority = 0;
-            std::string maskValue;
-
-            while (true) {
-                SkipWhitespace(json, pos);
-                if (pos >= json.size()) break;
-                if (json[pos] == '}') { pos++; break; }
-                if (json[pos] == ',') { pos++; SkipWhitespace(json, pos); }
-                if (json[pos] == '}') { pos++; break; }
-
-                std::string innerKey;
-                if (!ParseString(json, pos, innerKey)) break;
-                if (!ExpectChar(json, pos, ':')) break;
-
-                SkipWhitespace(json, pos);
-
-                if (innerKey == "pattern" || innerKey == "module" || innerKey == "rva" ||
-                    innerKey == "ida_pattern" || innerKey == "idaPattern" ||
-                    innerKey == "ida_style" || innerKey == "idaStyle" ||
-                    innerKey == "code_style_pattern" || innerKey == "codeStylePattern" ||
-                    innerKey == "bytes" || innerKey == "mask" || innerKey == "category" ||
-                    innerKey == "quality" || innerKey == "importance" || innerKey == "source" ||
-                    innerKey == "source_project" || innerKey == "sourceProject" ||
-                    innerKey == "source_url" || innerKey == "sourceUrl") {
-                    std::string val;
-                    if (ParseString(json, pos, val)) {
-                        if (innerKey == "pattern") {
-                            if (patternPriority <= 1) {
-                                entry.pattern = val;
-                                patternPriority = 1;
-                            }
-                        }
-                        else if (innerKey == "ida_pattern" || innerKey == "idaPattern" ||
-                                 innerKey == "ida_style" || innerKey == "idaStyle") {
-                            if (patternPriority <= 3) {
-                                entry.pattern = val;
-                                patternPriority = 3;
-                            }
-                        } else if (innerKey == "code_style_pattern" || innerKey == "codeStylePattern") {
-                            std::string convertedPattern;
-                            if (patternPriority <= 2 && ConvertCodeStylePatternToIda(val, convertedPattern)) {
-                                entry.pattern = convertedPattern;
-                                patternPriority = 2;
-                            }
-                        }
-                        else if (innerKey == "mask") maskValue = val;
-                        else if (innerKey == "module") entry.module = val;
-                        else if (innerKey == "rva") entry.rva = val;
-                        else if (innerKey == "category") entry.category = val;
-                        else if (innerKey == "quality") entry.quality = val;
-                        else if (innerKey == "importance") entry.importance = val;
-                        else if (innerKey == "source") entry.source = val;
-                        else if (innerKey == "source_project" || innerKey == "sourceProject") entry.sourceProject = val;
-                        else if (innerKey == "source_url" || innerKey == "sourceUrl") entry.sourceUrl = val;
-                    }
-                } else if (innerKey == "length" || innerKey == "address_offset" || innerKey == "offset" ||
-                           innerKey == "confidence" || innerKey == "source_count" || innerKey == "sourceCount") {
-                    std::int64_t numberValue = 0;
-                    if (ParseIntegerValue(json, pos, numberValue)) {
-                        if (innerKey == "length") {
-                            entry.length = static_cast<int>(numberValue);
-                        } else if (innerKey == "confidence") {
-                            entry.confidence = static_cast<int>(numberValue);
-                        } else if (innerKey == "source_count" || innerKey == "sourceCount") {
-                            entry.sourceCount = static_cast<int>(numberValue);
-                        } else {
-                            entry.addressOffset = numberValue;
-                        }
-                    } else {
-                        SkipValue(json, pos);
-                    }
-                } else if (innerKey == "required") {
-                    bool boolValue = true;
-                    if (ParseBoolValue(json, pos, boolValue)) {
-                        entry.required = boolValue;
-                        entry.hasRequiredFlag = true;
-                    } else {
-                        SkipValue(json, pos);
-                    }
-                } else {
-                    SkipValue(json, pos);
+                if (IsTextField(key)) {
+                    ApplyStringField(entry, key, stringValue);
+                    continue;
                 }
             }
 
-            if (!entry.pattern.empty()) {
-                if (patternPriority == 1 && !maskValue.empty()) {
-                    std::string convertedPattern;
-                    if (ConvertMaskedPatternToIda(entry.pattern, maskValue, convertedPattern)) {
-                        entry.pattern = convertedPattern;
-                    }
+            if (key == "required") {
+                bool boolValue = true;
+                if (ReadBool(field, boolValue)) {
+                    entry.required = boolValue;
+                    entry.hasRequiredFlag = true;
                 }
-                out.push_back(entry);
+                continue;
             }
-        } else {
-            SkipValue(json, pos);
+
+            std::int64_t numberValue = 0;
+            if (ReadInteger(field, numberValue)) {
+                ApplyNumberField(entry, key, numberValue);
+                continue;
+            }
         }
+
+        if (entry.pattern.empty()) {
+            continue;
+        }
+
+        if (patternPriority == 1 && !maskValue.empty()) {
+            std::string convertedPattern;
+            if (ConvertMaskedPatternToIda(entry.pattern, maskValue, convertedPattern)) {
+                entry.pattern = convertedPattern;
+            }
+        }
+
+        out.push_back(std::move(entry));
     }
 
     if (out.empty()) {

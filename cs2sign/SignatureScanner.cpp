@@ -1,11 +1,11 @@
 #include "SignatureScanner.h"
 
 #include "Console.h"
+#include "DumpUtils.h"
 
 #include <algorithm>
 #include <atomic>
 #include <chrono>
-#include <cctype>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -26,13 +26,6 @@ bool IsReadableRegionForScan(const MemoryRegion& region) {
            region.protect == PAGE_READONLY ||
            region.protect == PAGE_READWRITE ||
            region.protect == PAGE_WRITECOPY;
-}
-
-std::string ToLowerAscii(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char character) {
-        return static_cast<char>(std::tolower(character));
-    });
-    return value;
 }
 
 bool RegionBelongsToSignatureModule(const MemoryRegion& region, const Signature& signature) {
@@ -80,6 +73,48 @@ std::string SignatureStatus(const Signature& signature) {
 
     return signature.required ? "missing" : "optional_missing";
 }
+
+bool BuildPatternStrings(
+    const std::vector<PatternByte>& pattern,
+    std::string& outBytes,
+    std::string& outMask
+) {
+    outBytes.clear();
+    outMask.clear();
+
+    if (pattern.empty()) {
+        return false;
+    }
+
+    for (const PatternByte& byte : pattern) {
+        outBytes.push_back(static_cast<char>(byte.value));
+        outMask.push_back(byte.wildcard ? '?' : 'x');
+    }
+
+    return true;
+}
+
+bool CompileMaskedPattern(
+    const std::string& bytes,
+    const std::string& mask,
+    std::vector<PatternByte>& pattern
+) {
+    pattern.clear();
+
+    if (bytes.empty() || bytes.size() != mask.size()) {
+        return false;
+    }
+
+    pattern.reserve(bytes.size());
+    for (size_t index = 0; index < bytes.size(); ++index) {
+        pattern.push_back({
+            static_cast<std::uint8_t>(static_cast<unsigned char>(bytes[index])),
+            mask[index] == '?'
+        });
+    }
+
+    return true;
+}
 }
 
 SignatureScanner::SignatureScanner(ProcessMemoryReader& memory)
@@ -99,6 +134,7 @@ void SignatureScanner::AddSignature(
     signature.name = name;
     signature.pattern = pattern;
     signature.mask = mask;
+    CompileMaskedPattern(signature.pattern, signature.mask, signature.compiledPattern);
     signature.addressOffset = offset;
     signature.confidence = 0;
     signature.sourceCount = 0;
@@ -122,6 +158,7 @@ void SignatureScanner::AddSignature(
     signature.name = name;
     signature.pattern = std::string(pattern, patternLen);
     signature.mask = mask;
+    CompileMaskedPattern(signature.pattern, signature.mask, signature.compiledPattern);
     signature.addressOffset = offset;
     signature.confidence = 0;
     signature.sourceCount = 0;
@@ -139,31 +176,9 @@ bool SignatureScanner::ParseIDAPattern(
     std::string& outBytes,
     std::string& outMask
 ) {
-    outBytes.clear();
-    outMask.clear();
-
-    std::istringstream patternStream(idaPattern);
-    std::string patternToken;
-
-    while (patternStream >> patternToken) {
-        if (patternToken == "?" || patternToken == "??") {
-            outBytes += '\x00';
-            outMask += '?';
-            continue;
-        }
-
-        unsigned int byteValue = 0;
-        std::istringstream hexStream(patternToken);
-        hexStream >> std::hex >> byteValue;
-        if (hexStream.fail() || byteValue > 0xFF) {
-            return false;
-        }
-
-        outBytes += static_cast<char>(byteValue);
-        outMask += 'x';
-    }
-
-    return !outBytes.empty();
+    std::vector<PatternByte> pattern;
+    return ParseIdaPattern(idaPattern, pattern) &&
+           BuildPatternStrings(pattern, outBytes, outMask);
 }
 
 void SignatureScanner::AddSignatureFromIDA(
@@ -184,7 +199,9 @@ void SignatureScanner::AddSignatureFromIDA(
 ) {
     std::string patternBytes;
     std::string patternMask;
-    if (!ParseIDAPattern(idaPattern, patternBytes, patternMask)) {
+    std::vector<PatternByte> compiledPattern;
+    if (!ParseIdaPattern(idaPattern, compiledPattern) ||
+        !BuildPatternStrings(compiledPattern, patternBytes, patternMask)) {
         return;
     }
 
@@ -192,6 +209,7 @@ void SignatureScanner::AddSignatureFromIDA(
     signature.name = name;
     signature.pattern = patternBytes;
     signature.mask = patternMask;
+    signature.compiledPattern = std::move(compiledPattern);
     signature.module = module;
     signature.rva = rva;
     signature.category = category;
@@ -301,6 +319,17 @@ bool SignatureScanner::ValidateSignaturePattern(Signature& signature) {
         return false;
     }
 
+    if (signature.compiledPattern.empty() &&
+        !CompileMaskedPattern(signature.pattern, signature.mask, signature.compiledPattern)) {
+        signature.error = "Invalid compiled pattern";
+        return false;
+    }
+
+    if (signature.compiledPattern.size() != patternLength) {
+        signature.error = "Compiled pattern length mismatch";
+        return false;
+    }
+
     return true;
 }
 
@@ -331,7 +360,9 @@ std::vector<MemoryRegion> SignatureScanner::SelectRegionsForSignature(
     const std::vector<MemoryRegion>& candidateRegions
 ) {
     std::vector<MemoryRegion> scanRegions;
-    const size_t patternLength = signature.pattern.size();
+    const size_t patternLength = signature.compiledPattern.empty()
+        ? signature.pattern.size()
+        : signature.compiledPattern.size();
 
     for (const auto& region : candidateRegions) {
         if (region.size < patternLength) {
@@ -372,8 +403,7 @@ SignatureScanner::SignatureScanOutcome SignatureScanner::ScanSignatureRegions(
                 const uintptr_t matchAddress = ScanPatternOptimized(
                     region.base,
                     region.size,
-                    signature.pattern,
-                    signature.mask,
+                    signature.compiledPattern,
                     scanError
                 );
 
@@ -420,22 +450,20 @@ void SignatureScanner::RecordMissingSignature(Signature& signature, const Signat
 uintptr_t SignatureScanner::ScanPattern(
     uintptr_t start,
     size_t size,
-    const std::string& pattern,
-    const std::string& mask,
+    const std::vector<PatternByte>& pattern,
     std::string& error
 ) {
-    return ScanPatternOptimized(start, size, pattern, mask, error);
+    return ScanPatternOptimized(start, size, pattern, error);
 }
 
 uintptr_t SignatureScanner::ScanPatternOptimized(
     uintptr_t start,
     size_t size,
-    const std::string& pattern,
-    const std::string& mask,
+    const std::vector<PatternByte>& pattern,
     std::string& error
 ) {
     const size_t patternLength = pattern.size();
-    if (patternLength != mask.length() || patternLength == 0) {
+    if (patternLength == 0) {
         error = "Invalid pattern";
         return 0;
     }
@@ -447,11 +475,11 @@ uintptr_t SignatureScanner::ScanPatternOptimized(
     constexpr size_t maxChunkSize = 4 * 1024 * 1024;
     const size_t chunkSize = (size > maxChunkSize) ? maxChunkSize : size;
 
-    const uint8_t firstByte = static_cast<uint8_t>(pattern[0]);
-    const bool firstByteIsWildcard = (mask[0] == '?');
+    const uint8_t firstByte = pattern[0].value;
+    const bool firstByteIsWildcard = pattern[0].wildcard;
 
-    const uint8_t secondByte = (patternLength > 1) ? static_cast<uint8_t>(pattern[1]) : 0;
-    const bool secondByteIsWildcard = (patternLength > 1 && mask[1] == '?');
+    const uint8_t secondByte = (patternLength > 1) ? pattern[1].value : 0;
+    const bool secondByteIsWildcard = (patternLength > 1 && pattern[1].wildcard);
 
     std::vector<uint8_t> buffer(chunkSize);
 
@@ -481,7 +509,7 @@ uintptr_t SignatureScanner::ScanPatternOptimized(
                 continue;
             }
 
-            if (ComparePattern(buffer.data() + bufferOffset, pattern, mask, patternLength)) {
+            if (ComparePattern(buffer.data() + bufferOffset, pattern)) {
                 return start + regionOffset + bufferOffset;
             }
         }
@@ -492,13 +520,10 @@ uintptr_t SignatureScanner::ScanPatternOptimized(
 
 bool SignatureScanner::ComparePattern(
     const uint8_t* memoryBytes,
-    const std::string& pattern,
-    const std::string& mask,
-    size_t length
+    const std::vector<PatternByte>& pattern
 ) {
-    for (size_t byteIndex = 0; byteIndex < length; ++byteIndex) {
-        if (mask[byteIndex] == 'x' &&
-            memoryBytes[byteIndex] != static_cast<uint8_t>(pattern[byteIndex])) {
+    for (size_t byteIndex = 0; byteIndex < pattern.size(); ++byteIndex) {
+        if (!pattern[byteIndex].wildcard && memoryBytes[byteIndex] != pattern[byteIndex].value) {
             return false;
         }
     }
@@ -528,7 +553,7 @@ void SignatureScanner::WriteResultsJSON(std::ofstream& file) {
         const Signature& signature = m_signatures[signatureIndex];
 
         file << "    {\n";
-        file << "      \"name\": \"" << EscapeJSON(signature.name) << "\",\n";
+        file << "      \"name\": \"" << EscapeJson(signature.name) << "\",\n";
 
         std::ostringstream patternHex;
         std::ostringstream idaPattern;
@@ -557,22 +582,22 @@ void SignatureScanner::WriteResultsJSON(std::ofstream& file) {
         }
 
         file << "      \"pattern\": \"" << patternHex.str() << "\",\n";
-        file << "      \"ida_pattern\": \"" << EscapeJSON(idaPattern.str()) << "\",\n";
-        file << "      \"code_style_pattern\": \"" << EscapeJSON(codeStylePattern.str()) << "\",\n";
-        file << "      \"mask\": \"" << EscapeJSON(signature.mask) << "\",\n";
+        file << "      \"ida_pattern\": \"" << EscapeJson(idaPattern.str()) << "\",\n";
+        file << "      \"code_style_pattern\": \"" << EscapeJson(codeStylePattern.str()) << "\",\n";
+        file << "      \"mask\": \"" << EscapeJson(signature.mask) << "\",\n";
         if (!signature.module.empty()) {
-            file << "      \"module\": \"" << EscapeJSON(signature.module) << "\",\n";
+            file << "      \"module\": \"" << EscapeJson(signature.module) << "\",\n";
         }
         if (!signature.rva.empty()) {
-            file << "      \"rva\": \"" << EscapeJSON(signature.rva) << "\",\n";
+            file << "      \"rva\": \"" << EscapeJson(signature.rva) << "\",\n";
         }
         if (!signature.category.empty()) {
-            file << "      \"category\": \"" << EscapeJSON(signature.category) << "\",\n";
+            file << "      \"category\": \"" << EscapeJson(signature.category) << "\",\n";
         }
         if (!signature.quality.empty()) {
-            file << "      \"quality\": \"" << EscapeJSON(signature.quality) << "\",\n";
+            file << "      \"quality\": \"" << EscapeJson(signature.quality) << "\",\n";
         }
-        file << "      \"importance\": \"" << EscapeJSON(EffectiveImportance(signature)) << "\",\n";
+        file << "      \"importance\": \"" << EscapeJson(EffectiveImportance(signature)) << "\",\n";
         file << "      \"required\": " << (signature.required ? "true" : "false") << ",\n";
         file << "      \"status\": \"" << SignatureStatus(signature) << "\",\n";
         if (signature.confidence > 0) {
@@ -582,13 +607,13 @@ void SignatureScanner::WriteResultsJSON(std::ofstream& file) {
             file << "      \"source_count\": " << signature.sourceCount << ",\n";
         }
         if (!signature.source.empty()) {
-            file << "      \"source\": \"" << EscapeJSON(signature.source) << "\",\n";
+            file << "      \"source\": \"" << EscapeJson(signature.source) << "\",\n";
         }
         if (!signature.sourceProject.empty()) {
-            file << "      \"source_project\": \"" << EscapeJSON(signature.sourceProject) << "\",\n";
+            file << "      \"source_project\": \"" << EscapeJson(signature.sourceProject) << "\",\n";
         }
         if (!signature.sourceUrl.empty()) {
-            file << "      \"source_url\": \"" << EscapeJSON(signature.sourceUrl) << "\",\n";
+            file << "      \"source_url\": \"" << EscapeJson(signature.sourceUrl) << "\",\n";
         }
         file << "      \"found\": " << (signature.found ? "true" : "false") << ",\n";
 
@@ -598,7 +623,7 @@ void SignatureScanner::WriteResultsJSON(std::ofstream& file) {
             file << "      \"error\": null,\n";
         } else {
             file << "      \"address\": null,\n";
-            file << "      \"error\": \"" << EscapeJSON(signature.error) << "\",\n";
+            file << "      \"error\": \"" << EscapeJson(signature.error) << "\",\n";
         }
 
         file << "      \"regions_scanned\": " << std::dec << signature.regionsScanned << ",\n";
@@ -651,30 +676,4 @@ void SignatureScanner::WriteResultsJSON(std::ofstream& file) {
 void SignatureScanner::DumpResultsJSON(const std::string& filename) {
     m_jsonFilename = filename;
     UpdateJSONFile();
-}
-
-std::string SignatureScanner::EscapeJSON(const std::string& str) {
-    std::ostringstream escaped;
-
-    for (unsigned char character : str) {
-        switch (character) {
-            case '"': escaped << "\\\""; break;
-            case '\\': escaped << "\\\\"; break;
-            case '\b': escaped << "\\b"; break;
-            case '\f': escaped << "\\f"; break;
-            case '\n': escaped << "\\n"; break;
-            case '\r': escaped << "\\r"; break;
-            case '\t': escaped << "\\t"; break;
-            default:
-                if (character <= 0x1f) {
-                    escaped << "\\u"
-                            << std::hex << std::setw(4) << std::setfill('0')
-                            << static_cast<int>(character);
-                } else {
-                    escaped << static_cast<char>(character);
-                }
-        }
-    }
-
-    return escaped.str();
 }
