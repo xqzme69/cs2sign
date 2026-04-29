@@ -159,6 +159,8 @@ Automatically uses the input filename (e.g., `client.dll` -> `client`, `engine2.
 4. Walks class and enum binding hash tables externally
 5. Dumps fields, offsets, type names, base class names, enums, and metadata
 
+Schema dumping has hard limits for total classes, fields, enums, and enum values so bad schema pointers fail early instead of producing unbounded output.
+
 Schema metadata includes known entries such as:
 
 - `MNetworkVarNames`

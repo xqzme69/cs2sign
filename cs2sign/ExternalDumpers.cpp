@@ -19,6 +19,10 @@ constexpr size_t kMaxHashElements = 100000;
 constexpr size_t kMaxFields = 4096;
 constexpr size_t kMaxMetadata = 256;
 constexpr size_t kMaxEnums = 4096;
+constexpr size_t kMaxSchemaClassesTotal = 50000;
+constexpr size_t kMaxSchemaFieldsTotal = 500000;
+constexpr size_t kMaxSchemaEnumsTotal = 50000;
+constexpr size_t kMaxSchemaEnumValuesTotal = 500000;
 constexpr size_t kMaxInterfacesPerModule = 4096;
 constexpr std::int32_t kMaxClassSize = 0x400000;
 
@@ -600,6 +604,10 @@ std::vector<SchemaModuleDump> ReadSchemaModules(ProcessMemoryReader& process) {
 
     std::vector<SchemaModuleDump> modules;
     modules.reserve(static_cast<size_t>(typeScopes.count));
+    size_t totalClasses = 0;
+    size_t totalFields = 0;
+    size_t totalEnums = 0;
+    size_t totalEnumValues = 0;
 
     for (std::int32_t index = 0; index < typeScopes.count; ++index) {
         std::uint64_t typeScopeAddress = 0;
@@ -624,6 +632,16 @@ std::vector<SchemaModuleDump> ReadSchemaModules(ProcessMemoryReader& process) {
         for (std::uint64_t classAddress : classes) {
             auto classInfo = ReadSchemaClass(process, classAddress);
             if (classInfo) {
+                if (totalClasses >= kMaxSchemaClassesTotal) {
+                    throw std::runtime_error("schema class limit exceeded");
+                }
+
+                totalFields += classInfo->fields.size();
+                if (totalFields > kMaxSchemaFieldsTotal) {
+                    throw std::runtime_error("schema field limit exceeded");
+                }
+
+                ++totalClasses;
                 module.classes.push_back(std::move(*classInfo));
             }
         }
@@ -633,6 +651,16 @@ std::vector<SchemaModuleDump> ReadSchemaModules(ProcessMemoryReader& process) {
         for (std::uint64_t enumAddress : enums) {
             auto enumInfo = ReadSchemaEnum(process, enumAddress);
             if (enumInfo) {
+                if (totalEnums >= kMaxSchemaEnumsTotal) {
+                    throw std::runtime_error("schema enum limit exceeded");
+                }
+
+                totalEnumValues += enumInfo->fields.size();
+                if (totalEnumValues > kMaxSchemaEnumValuesTotal) {
+                    throw std::runtime_error("schema enum value limit exceeded");
+                }
+
+                ++totalEnums;
                 module.enums.push_back(std::move(*enumInfo));
             }
         }
