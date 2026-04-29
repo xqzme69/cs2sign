@@ -211,6 +211,7 @@ This command reads `dump\schemas\*.json` and does not require CS2 to be running.
 | `--emit-sdk` | Generate `dump\sdk\cpp`, `csharp`, `rust`, `zig`, and `ida.h` from schema JSON |
 | `--output <dir>` | Set read-only dumper output directory |
 | `--no-pause` | Exit without waiting for a key press |
+| `--version` | Print the cs2sign version |
 | `--help` | Print help text |
 
 ## Output Files

@@ -18,6 +18,7 @@
 #include <vector>
 
 namespace {
+constexpr const char* kCs2SignVersion = "0.1.5";
 constexpr const char* kDefaultSignatureInputPath = "signatures.json";
 constexpr const char* kDefaultRemoteSignatureManifestUrl =
     "https://api.github.com/repos/xqzme69/cs2sign/contents/signatures/index.json?ref=main";
@@ -42,6 +43,7 @@ struct RuntimeOptions {
 struct CommandLineParseResult {
     RuntimeOptions options;
     bool shouldShowHelp = false;
+    bool shouldShowVersion = false;
     bool hasError = false;
     std::string errorMessage;
 };
@@ -149,6 +151,7 @@ void PrintUsage() {
         << "  --emit-sdk         Generate SDK files from dump\\schemas.\n"
         << "  --output <dir>     Output directory for read-only dumpers (default: dump).\n"
         << "  --no-pause         Exit immediately instead of waiting for a key press.\n"
+        << "  --version          Show cs2sign version.\n"
         << "  --help             Show this help text.\n";
 }
 
@@ -161,6 +164,11 @@ CommandLineParseResult ParseCommandLine(int argc, char* argv[]) {
 
         if (argument == "--help" || argument == "-h") {
             parseResult.shouldShowHelp = true;
+            return parseResult;
+        }
+
+        if (argument == "--version" || argument == "-v") {
+            parseResult.shouldShowVersion = true;
             return parseResult;
         }
 
@@ -722,6 +730,7 @@ void WriteUpdateReport(
 
     file << "{\n";
     file << "  \"generator\": \"cs2sign\",\n";
+    file << "  \"generator_version\": \"" << kCs2SignVersion << "\",\n";
     file << "  \"timestamp\": \"" << CurrentTimestampUtc() << "\",\n";
     file << "  \"health\": \"" << DetermineHealthStatus(report) << "\",\n";
     file << "  \"process\": {\n";
@@ -925,6 +934,11 @@ int main(int argc, char* argv[]) {
 
     if (commandLine.shouldShowHelp) {
         PrintUsage();
+        return 0;
+    }
+
+    if (commandLine.shouldShowVersion) {
+        std::cout << "cs2sign " << kCs2SignVersion << "\n";
         return 0;
     }
 

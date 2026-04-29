@@ -90,6 +90,7 @@ Useful options:
 --emit-sdk         Generate SDK files from dump\schemas.
 --output <dir>     Output directory for read-only dumpers (default: dump).
 --no-pause         Exit immediately instead of waiting for a key press.
+--version          Show cs2sign version.
 --help             Show usage.
 ```
 
