@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DumpUtils.h"
 #include "ProcessMemoryReader.h"
 #include <vector>
 #include <string>
@@ -13,6 +14,7 @@ struct Signature {
     std::string name;
     std::string pattern;
     std::string mask;
+    std::vector<PatternByte> compiledPattern;
     std::string module;     // target module (e.g. "client")
     std::string rva;        // original RVA from IDA
     std::string category;   // game/module/library/runtime/etc.
@@ -84,9 +86,9 @@ private:
     void RecordMissingSignature(Signature& signature, const SignatureScanOutcome& outcome);
     void WriteResultsJSON(std::ofstream& file);
 
-    uintptr_t ScanPattern(uintptr_t start, size_t size, const std::string& pattern, const std::string& mask, std::string& error);
-    uintptr_t ScanPatternOptimized(uintptr_t start, size_t size, const std::string& pattern, const std::string& mask, std::string& error);
-    bool ComparePattern(const uint8_t* memoryBytes, const std::string& pattern, const std::string& mask, size_t length);
+    uintptr_t ScanPattern(uintptr_t start, size_t size, const std::vector<PatternByte>& pattern, std::string& error);
+    uintptr_t ScanPatternOptimized(uintptr_t start, size_t size, const std::vector<PatternByte>& pattern, std::string& error);
+    bool ComparePattern(const uint8_t* memoryBytes, const std::vector<PatternByte>& pattern);
 
     ProcessMemoryReader& m_memory;
     std::vector<Signature> m_signatures;

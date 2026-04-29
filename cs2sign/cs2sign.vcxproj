@@ -190,6 +190,7 @@
     <ClInclude Include="RemoteSignatureProvider.h" />
     <ClInclude Include="SignatureScanner.h" />
     <ClInclude Include="JSONParser.h" />
+    <ClInclude Include="JsonReader.h" />
     <ClInclude Include="SignatureLoader.h" />
     <ClInclude Include="Console.h" />
     <ClInclude Include="DumpUtils.h" />
@@ -203,6 +204,7 @@
     <ClCompile Include="RemoteSignatureProvider.cpp" />
     <ClCompile Include="SignatureScanner.cpp" />
     <ClCompile Include="JSONParser.cpp" />
+    <ClCompile Include="JsonReader.cpp" />
     <ClCompile Include="Console.cpp" />
     <ClCompile Include="DumpUtils.cpp" />
     <ClCompile Include="ExternalDumpers.cpp" />

@@ -73,6 +73,48 @@ std::string SignatureStatus(const Signature& signature) {
 
     return signature.required ? "missing" : "optional_missing";
 }
+
+bool BuildPatternStrings(
+    const std::vector<PatternByte>& pattern,
+    std::string& outBytes,
+    std::string& outMask
+) {
+    outBytes.clear();
+    outMask.clear();
+
+    if (pattern.empty()) {
+        return false;
+    }
+
+    for (const PatternByte& byte : pattern) {
+        outBytes.push_back(static_cast<char>(byte.value));
+        outMask.push_back(byte.wildcard ? '?' : 'x');
+    }
+
+    return true;
+}
+
+bool CompileMaskedPattern(
+    const std::string& bytes,
+    const std::string& mask,
+    std::vector<PatternByte>& pattern
+) {
+    pattern.clear();
+
+    if (bytes.empty() || bytes.size() != mask.size()) {
+        return false;
+    }
+
+    pattern.reserve(bytes.size());
+    for (size_t index = 0; index < bytes.size(); ++index) {
+        pattern.push_back({
+            static_cast<std::uint8_t>(static_cast<unsigned char>(bytes[index])),
+            mask[index] == '?'
+        });
+    }
+
+    return true;
+}
 }
 
 SignatureScanner::SignatureScanner(ProcessMemoryReader& memory)
@@ -92,6 +134,7 @@ void SignatureScanner::AddSignature(
     signature.name = name;
     signature.pattern = pattern;
     signature.mask = mask;
+    CompileMaskedPattern(signature.pattern, signature.mask, signature.compiledPattern);
     signature.addressOffset = offset;
     signature.confidence = 0;
     signature.sourceCount = 0;
@@ -115,6 +158,7 @@ void SignatureScanner::AddSignature(
     signature.name = name;
     signature.pattern = std::string(pattern, patternLen);
     signature.mask = mask;
+    CompileMaskedPattern(signature.pattern, signature.mask, signature.compiledPattern);
     signature.addressOffset = offset;
     signature.confidence = 0;
     signature.sourceCount = 0;
@@ -132,31 +176,9 @@ bool SignatureScanner::ParseIDAPattern(
     std::string& outBytes,
     std::string& outMask
 ) {
-    outBytes.clear();
-    outMask.clear();
-
-    std::istringstream patternStream(idaPattern);
-    std::string patternToken;
-
-    while (patternStream >> patternToken) {
-        if (patternToken == "?" || patternToken == "??") {
-            outBytes += '\x00';
-            outMask += '?';
-            continue;
-        }
-
-        unsigned int byteValue = 0;
-        std::istringstream hexStream(patternToken);
-        hexStream >> std::hex >> byteValue;
-        if (hexStream.fail() || byteValue > 0xFF) {
-            return false;
-        }
-
-        outBytes += static_cast<char>(byteValue);
-        outMask += 'x';
-    }
-
-    return !outBytes.empty();
+    std::vector<PatternByte> pattern;
+    return ParseIdaPattern(idaPattern, pattern) &&
+           BuildPatternStrings(pattern, outBytes, outMask);
 }
 
 void SignatureScanner::AddSignatureFromIDA(
@@ -177,7 +199,9 @@ void SignatureScanner::AddSignatureFromIDA(
 ) {
     std::string patternBytes;
     std::string patternMask;
-    if (!ParseIDAPattern(idaPattern, patternBytes, patternMask)) {
+    std::vector<PatternByte> compiledPattern;
+    if (!ParseIdaPattern(idaPattern, compiledPattern) ||
+        !BuildPatternStrings(compiledPattern, patternBytes, patternMask)) {
         return;
     }
 
@@ -185,6 +209,7 @@ void SignatureScanner::AddSignatureFromIDA(
     signature.name = name;
     signature.pattern = patternBytes;
     signature.mask = patternMask;
+    signature.compiledPattern = std::move(compiledPattern);
     signature.module = module;
     signature.rva = rva;
     signature.category = category;
@@ -294,6 +319,17 @@ bool SignatureScanner::ValidateSignaturePattern(Signature& signature) {
         return false;
     }
 
+    if (signature.compiledPattern.empty() &&
+        !CompileMaskedPattern(signature.pattern, signature.mask, signature.compiledPattern)) {
+        signature.error = "Invalid compiled pattern";
+        return false;
+    }
+
+    if (signature.compiledPattern.size() != patternLength) {
+        signature.error = "Compiled pattern length mismatch";
+        return false;
+    }
+
     return true;
 }
 
@@ -324,7 +360,9 @@ std::vector<MemoryRegion> SignatureScanner::SelectRegionsForSignature(
     const std::vector<MemoryRegion>& candidateRegions
 ) {
     std::vector<MemoryRegion> scanRegions;
-    const size_t patternLength = signature.pattern.size();
+    const size_t patternLength = signature.compiledPattern.empty()
+        ? signature.pattern.size()
+        : signature.compiledPattern.size();
 
     for (const auto& region : candidateRegions) {
         if (region.size < patternLength) {
@@ -365,8 +403,7 @@ SignatureScanner::SignatureScanOutcome SignatureScanner::ScanSignatureRegions(
                 const uintptr_t matchAddress = ScanPatternOptimized(
                     region.base,
                     region.size,
-                    signature.pattern,
-                    signature.mask,
+                    signature.compiledPattern,
                     scanError
                 );
 
@@ -413,22 +450,20 @@ void SignatureScanner::RecordMissingSignature(Signature& signature, const Signat
 uintptr_t SignatureScanner::ScanPattern(
     uintptr_t start,
     size_t size,
-    const std::string& pattern,
-    const std::string& mask,
+    const std::vector<PatternByte>& pattern,
     std::string& error
 ) {
-    return ScanPatternOptimized(start, size, pattern, mask, error);
+    return ScanPatternOptimized(start, size, pattern, error);
 }
 
 uintptr_t SignatureScanner::ScanPatternOptimized(
     uintptr_t start,
     size_t size,
-    const std::string& pattern,
-    const std::string& mask,
+    const std::vector<PatternByte>& pattern,
     std::string& error
 ) {
     const size_t patternLength = pattern.size();
-    if (patternLength != mask.length() || patternLength == 0) {
+    if (patternLength == 0) {
         error = "Invalid pattern";
         return 0;
     }
@@ -440,11 +475,11 @@ uintptr_t SignatureScanner::ScanPatternOptimized(
     constexpr size_t maxChunkSize = 4 * 1024 * 1024;
     const size_t chunkSize = (size > maxChunkSize) ? maxChunkSize : size;
 
-    const uint8_t firstByte = static_cast<uint8_t>(pattern[0]);
-    const bool firstByteIsWildcard = (mask[0] == '?');
+    const uint8_t firstByte = pattern[0].value;
+    const bool firstByteIsWildcard = pattern[0].wildcard;
 
-    const uint8_t secondByte = (patternLength > 1) ? static_cast<uint8_t>(pattern[1]) : 0;
-    const bool secondByteIsWildcard = (patternLength > 1 && mask[1] == '?');
+    const uint8_t secondByte = (patternLength > 1) ? pattern[1].value : 0;
+    const bool secondByteIsWildcard = (patternLength > 1 && pattern[1].wildcard);
 
     std::vector<uint8_t> buffer(chunkSize);
 
@@ -474,7 +509,7 @@ uintptr_t SignatureScanner::ScanPatternOptimized(
                 continue;
             }
 
-            if (ComparePattern(buffer.data() + bufferOffset, pattern, mask, patternLength)) {
+            if (ComparePattern(buffer.data() + bufferOffset, pattern)) {
                 return start + regionOffset + bufferOffset;
             }
         }
@@ -485,13 +520,10 @@ uintptr_t SignatureScanner::ScanPatternOptimized(
 
 bool SignatureScanner::ComparePattern(
     const uint8_t* memoryBytes,
-    const std::string& pattern,
-    const std::string& mask,
-    size_t length
+    const std::vector<PatternByte>& pattern
 ) {
-    for (size_t byteIndex = 0; byteIndex < length; ++byteIndex) {
-        if (mask[byteIndex] == 'x' &&
-            memoryBytes[byteIndex] != static_cast<uint8_t>(pattern[byteIndex])) {
+    for (size_t byteIndex = 0; byteIndex < pattern.size(); ++byteIndex) {
+        if (!pattern[byteIndex].wildcard && memoryBytes[byteIndex] != pattern[byteIndex].value) {
             return false;
         }
     }
