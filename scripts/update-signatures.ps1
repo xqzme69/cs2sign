@@ -10,6 +10,24 @@ $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 $SourcePath = Join-Path $Root $Source
 $OutputPath = Join-Path $Root $Output
+$Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+
+function Write-Utf8NoBomLf {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Text
+    )
+
+    $Text = $Text -replace "`r`n", "`n" -replace "`r", "`n"
+    if (-not $Text.EndsWith("`n")) {
+        $Text += "`n"
+    }
+
+    [System.IO.File]::WriteAllText($Path, $Text, $Utf8NoBom)
+}
 
 if (-not (Test-Path -LiteralPath $SourcePath)) {
     throw "Signature source directory was not found: $SourcePath"
@@ -26,7 +44,9 @@ if (-not $SourceFiles) {
 }
 
 foreach ($File in $SourceFiles) {
-    Copy-Item -LiteralPath $File.FullName -Destination (Join-Path $OutputPath $File.Name) -Force
+    $Destination = Join-Path $OutputPath $File.Name
+    $Text = [System.IO.File]::ReadAllText($File.FullName)
+    Write-Utf8NoBomLf -Path $Destination -Text $Text
 }
 
 $Entries = foreach ($File in Get-ChildItem -LiteralPath $OutputPath -Filter "*_signatures.json" | Sort-Object Name) {
@@ -49,7 +69,6 @@ $Index = [ordered]@{
 
 $IndexPath = Join-Path $OutputPath "index.json"
 $IndexJson = $Index | ConvertTo-Json -Depth 8
-$Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
-[System.IO.File]::WriteAllText($IndexPath, $IndexJson + [Environment]::NewLine, $Utf8NoBom)
+Write-Utf8NoBomLf -Path $IndexPath -Text $IndexJson
 
 Write-Host "Updated $($Entries.Count) signature file(s) in $OutputPath"
