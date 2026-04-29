@@ -22,7 +22,7 @@
 namespace {
 constexpr const char* kDefaultSignatureInputPath = "signatures.json";
 constexpr const char* kDefaultRemoteSignatureManifestUrl =
-    "https://raw.githubusercontent.com/xqzme69/cs2sign/main/signatures/index.json";
+    "https://api.github.com/repos/xqzme69/cs2sign/contents/signatures/index.json?ref=main";
 constexpr const wchar_t* kTargetProcessName = L"cs2.exe";
 
 enum class SignatureSourceMode {
@@ -146,7 +146,7 @@ void PrintUsage() {
         << "  --remote-signatures\n"
         << "                     Download generated JSON signatures from the GitHub index (default).\n"
         << "  --remote-signatures-url <url>\n"
-        << "                     Override the GitHub raw index URL.\n"
+        << "                     Override the GitHub signature index URL.\n"
         << "  --local-signatures Use *_signatures.json files from the exe/current directory.\n"
         << "  --no-signatures    Skip signature scanning and run only selected dumpers.\n"
         << "  --dump-all         Run read-only schemas, interfaces, offsets, and dump_info.\n"
