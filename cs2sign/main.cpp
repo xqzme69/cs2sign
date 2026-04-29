@@ -2,6 +2,7 @@
 
 #include "BadApplePlayer.h"
 #include "Console.h"
+#include "DumpUtils.h"
 #include "ExternalDumpers.h"
 #include "ProcessMemoryReader.h"
 #include "RemoteSignatureProvider.h"
@@ -9,12 +10,10 @@
 #include "SignatureLoader.h"
 #include "SignatureScanner.h"
 
-#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -366,16 +365,6 @@ void PrintInteractiveMenu() {
     Console::ResetColor();
 }
 
-std::string ToLowerAscii(std::string answer) {
-    for (char& character : answer) {
-        if (character >= 'A' && character <= 'Z') {
-            character = static_cast<char>(character - 'A' + 'a');
-        }
-    }
-
-    return answer;
-}
-
 bool ConfigureConsoleOutputFromInteractiveMenu(RuntimeOptions& options) {
     PrintConsoleOutputMenu();
 
@@ -666,76 +655,6 @@ size_t CountOptionalFoundSignatures(const SignatureScanner& scanner) {
     return count;
 }
 
-std::string CurrentTimestampUtc() {
-    const auto now = std::chrono::system_clock::now();
-    const std::time_t nowTime = std::chrono::system_clock::to_time_t(now);
-    std::tm utcTime{};
-    gmtime_s(&utcTime, &nowTime);
-
-    std::ostringstream stream;
-    stream << std::put_time(&utcTime, "%Y-%m-%dT%H:%M:%SZ");
-    return stream.str();
-}
-
-std::string EscapeJson(const std::string& value) {
-    std::ostringstream escaped;
-
-    for (unsigned char character : value) {
-        switch (character) {
-            case '"': escaped << "\\\""; break;
-            case '\\': escaped << "\\\\"; break;
-            case '\b': escaped << "\\b"; break;
-            case '\f': escaped << "\\f"; break;
-            case '\n': escaped << "\\n"; break;
-            case '\r': escaped << "\\r"; break;
-            case '\t': escaped << "\\t"; break;
-            default:
-                if (character <= 0x1f) {
-                    escaped << "\\u"
-                            << std::hex << std::setw(4) << std::setfill('0')
-                            << static_cast<int>(character);
-                } else {
-                    escaped << static_cast<char>(character);
-                }
-        }
-    }
-
-    return escaped.str();
-}
-
-std::string WideToUtf8ForReport(const std::wstring& value) {
-    if (value.empty()) {
-        return {};
-    }
-
-    const int requiredLength = WideCharToMultiByte(
-        CP_UTF8,
-        0,
-        value.c_str(),
-        static_cast<int>(value.size()),
-        nullptr,
-        0,
-        nullptr,
-        nullptr
-    );
-    if (requiredLength <= 0) {
-        return {};
-    }
-
-    std::string result(static_cast<size_t>(requiredLength), '\0');
-    WideCharToMultiByte(
-        CP_UTF8,
-        0,
-        value.c_str(),
-        static_cast<int>(value.size()),
-        result.data(),
-        requiredLength,
-        nullptr,
-        nullptr
-    );
-    return result;
-}
-
 void RefreshSignatureHealth(RunHealthReport& report, const SignatureScanner& scanner) {
     report.totalSignatureCount = scanner.GetSignatures().size();
     report.foundSignatureCount = CountFoundSignatures(scanner);
@@ -867,8 +786,8 @@ void WriteUpdateReport(
     for (size_t index = 0; index < modules.size(); ++index) {
         const ProcessModule& module = modules[index];
         file << "    {\n";
-        file << "      \"name\": \"" << EscapeJson(WideToUtf8ForReport(module.name)) << "\",\n";
-        file << "      \"path\": \"" << EscapeJson(WideToUtf8ForReport(module.path)) << "\",\n";
+        file << "      \"name\": \"" << EscapeJson(WideToUtf8(module.name)) << "\",\n";
+        file << "      \"path\": \"" << EscapeJson(WideToUtf8(module.path)) << "\",\n";
         file << "      \"base\": \"0x" << std::hex << std::uppercase << module.base << std::dec << "\",\n";
         file << "      \"size\": " << module.size << "\n";
         file << "    }" << (index + 1 == modules.size() ? "" : ",") << "\n";
