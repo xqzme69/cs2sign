@@ -8,9 +8,18 @@ param(
 $ErrorActionPreference = "Stop"
 
 $Root = Split-Path -Parent $PSScriptRoot
-$SourcePath = Join-Path $Root $Source
-$OutputPath = Join-Path $Root $Output
 $Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+
+function Resolve-InputPath {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if ([System.IO.Path]::IsPathRooted($Path)) {
+        return $Path
+    }
+    return Join-Path $Root $Path
+}
+
+$SourcePath = Resolve-InputPath $Source
+$OutputPath = Resolve-InputPath $Output
 
 function Write-Utf8NoBomLf {
     param(

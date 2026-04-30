@@ -34,6 +34,17 @@ cs2_signatures.json
 dump/
 **/dump/
 
+# Local research dumps
+client_mass_signatures_*.json
+client_mass_signatures_*.txt
+client_mass_signatures_report.md
+patterns_full.txt
+cs2 reverse.md
+
+# Local automation config
+scripts/auto-update-config.json
+scripts/stderr.txt
+
 # Archives and temporary files
 *.zip
 *.7z

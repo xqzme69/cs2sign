@@ -2,14 +2,14 @@
   "schema_version": 1,
   "project": "cs2sign",
   "source": "github",
-  "build": "14156",
-  "generated_at": "2026-04-29T18:17:53Z",
+  "build": "14158",
+  "generated_at": "2026-05-01T22:20:35Z",
   "base_url": "https://api.github.com/repos/xqzme69/cs2sign/contents/signatures/",
   "files": [
     {
       "name": "client_signatures.json",
-      "sha256": "7a68e9d8531cb0bc24d999aaa3d812d9e76f9fe9e11e6257a32997c0746d8566",
-      "size": 27581
+      "sha256": "5ae48806908a7c14b7b817dc3a5e20cf7ba3037cd581331dcf1daa32b5a701df",
+      "size": 27582
     },
     {
       "name": "engine2_signatures.json",

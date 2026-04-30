@@ -1,0 +1,31 @@
+{
+  "targets": [
+    {
+      "name": "dwEntityList",
+      "type": "global_rva",
+      "rva": "0x0",
+      "result_type": "module_rva",
+      "description": "Find code that references a global address and emit a RIP-relative resolver.",
+      "category": "game",
+      "max_candidates": 3
+    },
+    {
+      "name": "m_iHealth",
+      "type": "field_offset",
+      "offset": "0x0",
+      "result_type": "field_offset",
+      "description": "Find code that uses a member displacement and emit a displacement resolver.",
+      "category": "schema",
+      "function_contains": "",
+      "max_candidates": 3
+    },
+    {
+      "name": "CreateInterface",
+      "type": "direct_rva",
+      "rva": "0x0",
+      "result_type": "function_address",
+      "description": "Sign a known function RVA without an operand resolver.",
+      "category": "game"
+    }
+  ]
+}

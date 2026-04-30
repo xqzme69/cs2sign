@@ -1,2 +1,3 @@
+* text=auto eol=lf
 *.bap binary
 signatures/*.json text eol=lf

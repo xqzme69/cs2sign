@@ -102,6 +102,31 @@ Automatically uses the input filename (e.g., `client.dll` -> `client`, `engine2.
 
 `rva` is the function entry RVA. `pattern_rva` is where the byte pattern starts. `address_offset` is applied by the C++ scanner to resolve an interior match back to the function entry. The scanner accepts `pattern`, `ida_pattern`, or `code_style_pattern` as the source pattern.
 
+For signatures generated from offset references, add a `resolver` object:
+
+```json
+{
+  "dwEntityList": {
+    "pattern": "48 8B 0D ? ? ? ? 48 89 7C 24 ?",
+    "module": "client",
+    "result_type": "module_rva",
+    "resolver": {
+      "type": "rip_relative",
+      "result_type": "module_rva",
+      "instruction_offset": 0,
+      "instruction_size": 7,
+      "operand_offset": 3,
+      "operand_size": 4,
+      "add": 7
+    }
+  }
+}
+```
+
+`rip_relative` resolves `match + add + displacement`. `instruction_displacement` reads the operand displacement and reports that value, which is useful for field offsets. `direct_match` keeps the old match-address behavior. `result_type` can be `absolute_address`, `module_rva`, `field_offset`, or `function_address`.
+
+When read-only offset dumping runs after a signature scan, resolved results from `cs2_signatures.json` are merged into `dump\offsets.json`. Module addresses are converted to RVAs when the module is loaded; field displacements are emitted as field offsets.
+
 `category`, `importance`, and `required` feed scanner health. `game` and `module` are required unless the JSON says otherwise. `library`, `runtime`, `thunk`, and `auto` are optional.
 
 **Hotkey:** Ctrl-Shift-S (when loaded as IDA plugin)
@@ -531,9 +556,9 @@ This is a ~40x performance improvement for module-specific signatures.
 
 ---
 
-## Workflow After CS2 Update
+## Maintainer Workflow After CS2 Update
 
-When Counter-Strike 2 receives an update, function addresses and byte patterns change. To update signatures:
+When Counter-Strike 2 receives an update, function addresses and byte patterns change. End users do not need this workflow: the executable normally downloads the published GitHub signature pack. This section is for maintainers or contributors regenerating `signatures/`.
 
 ### Quick Update (Recommended)
 
@@ -548,10 +573,13 @@ When Counter-Strike 2 receives an update, function addresses and byte patterns c
 
 2. Run the plugin (Ctrl-Shift-S) on each DLL
    - Produces: `client_signatures.json`, `engine2_signatures.json`, etc.
+   - Headless runs can set `CS2SIG_OUTPUT_DIR` to choose the output folder.
+   - `CS2SIG_HEADLESS=1` exits IDA with a process exit code after script completion.
+   - `CS2SIG_NO_CPP=1`, `CS2SIG_NO_REPORT=1`, and `CS2SIG_NO_MANIFEST=1` keep automated runs JSON-only.
 
 3. Run `.\scripts\update-signatures.ps1` from the repository root to copy generated files into `signatures\` and refresh `signatures\index.json`
 
-4. Commit and push the refreshed `signatures\` directory
+4. Maintainers can commit and publish the refreshed `signatures\` directory
 
 5. Run `cs2sign.exe` and choose GitHub signatures, or choose Local mode for files placed next to the executable
 
@@ -581,7 +609,7 @@ Re-run IDA plugin on updated DLLs, or use migration mode with the previous manif
 New *_signatures.json files generated
     |
     v
-Refresh signatures/index.json and push signatures/
+Refresh signatures/index.json and publish signatures/
     |
     v
 Scanner downloads the new pack; update_report.json shows remaining failures

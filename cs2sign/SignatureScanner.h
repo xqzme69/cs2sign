@@ -10,6 +10,28 @@
 #include <atomic>
 #include <algorithm>
 
+struct SignatureResolver {
+    std::string type;
+    std::string resultType;
+    std::string targetRva;
+    std::string formula;
+    std::int64_t add = 0;
+    std::int64_t expected = 0;
+    int instructionOffset = 0;
+    int instructionSize = 0;
+    int operandIndex = -1;
+    int operandOffset = 0;
+    int operandSize = 0;
+    bool hasAdd = false;
+    bool hasExpected = false;
+    bool hasInstructionOffset = false;
+    bool hasInstructionSize = false;
+    bool hasOperandIndex = false;
+    bool hasOperandOffset = false;
+    bool hasOperandSize = false;
+    bool enabled = false;
+};
+
 struct Signature {
     std::string name;
     std::string pattern;
@@ -23,11 +45,17 @@ struct Signature {
     std::string source;
     std::string sourceProject;
     std::string sourceUrl;
+    std::string resultType;
+    SignatureResolver resolver;
     intptr_t addressOffset;
     int confidence;
     int sourceCount;
     bool required;
+    uintptr_t matchAddress;
     uintptr_t resolvedAddress;
+    std::uint32_t moduleRva;
+    bool hasModuleRva;
+    std::string resolverStatus;
     bool found;
     std::string error;
     size_t regionsScanned;
@@ -50,7 +78,8 @@ public:
                              const std::string& quality = "", const std::string& importance = "",
                              int confidence = 0, int sourceCount = 0,
                              const std::string& source = "", const std::string& sourceProject = "",
-                             const std::string& sourceUrl = "", bool required = true);
+                             const std::string& sourceUrl = "", bool required = true,
+                             const SignatureResolver& resolver = {}, const std::string& resultType = "");
 
     void ScanAll();
     void DumpResultsJSON(const std::string& filename = "cs2_signatures.json");
@@ -84,6 +113,7 @@ private:
     );
     void RecordFoundSignature(Signature& signature, const SignatureScanOutcome& outcome);
     void RecordMissingSignature(Signature& signature, const SignatureScanOutcome& outcome);
+    bool ResolveSignatureAddress(Signature& signature, uintptr_t matchAddress);
     void WriteResultsJSON(std::ofstream& file);
 
     uintptr_t ScanPattern(uintptr_t start, size_t size, const std::vector<PatternByte>& pattern, std::string& error);
