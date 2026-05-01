@@ -75,6 +75,7 @@ $PushAttempts = Cfg "push_attempts"       3
 $MaxFailures = Cfg "max_consecutive_failures" 5
 $RequireAllModules = Cfg "require_all_modules" $true
 $CreateGitHubRelease = Cfg "create_github_release" $false
+$MaxSignatureDropPercent = Cfg "max_signature_drop_percent" 80
 $CleanupIdb = Cfg "cleanup_idb"         $true
 $LogRetentionDays = Cfg "log_retention_days"  30
 $IdaPriority = Cfg "ida_priority"        "BelowNormal"
@@ -407,6 +408,26 @@ function Update-Signatures([int]$BuildId, [hashtable[]]$Results) {
 
     if ($copiedCount -ne $Modules.Count) {
         Write-Log "Expected $($Modules.Count) signature files, staged $copiedCount" "ERROR"
+        return $false
+    }
+
+    $compareScript = Join-Path $RepoPath "scripts\compare-signatures.ps1"
+    if (Test-Path $compareScript) {
+        $compareReport = Join-Path $WorkDir "signature_compare.json"
+        Write-Log "Running compare-signatures.ps1..."
+        & pwsh -NoProfile -File $compareScript `
+            -Baseline (Join-Path $RepoPath "signatures") `
+            -Candidate $SignatureStageDir `
+            -OutputReport $compareReport `
+            -MaxDropPercent $MaxSignatureDropPercent `
+            -MinTotalSignatures 1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "compare-signatures.ps1 failed with exit code $LASTEXITCODE" "ERROR"
+            return $false
+        }
+    }
+    else {
+        Write-Log "compare-signatures.ps1 not found" "ERROR"
         return $false
     }
 

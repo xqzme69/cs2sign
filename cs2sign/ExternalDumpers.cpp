@@ -1,6 +1,7 @@
 #include "ExternalDumpers.h"
 
 #include "DumpUtils.h"
+#include "JsonReader.h"
 
 #include <algorithm>
 #include <fstream>
@@ -208,6 +209,8 @@ struct KnownOffsetInfo {
     bool found = false;
     std::uint32_t rva = 0;
     std::string error;
+    std::string source = "pattern";
+    std::string resultType = "module_rva";
 };
 
 template <typename T>
@@ -1160,6 +1163,205 @@ void ApplyBuildKnownOffsets(std::vector<KnownOffsetInfo>& offsets, std::uint32_t
     }
 }
 
+bool JsonStringField(const JsonValue& object, const std::string& key, std::string& value) {
+    if (object.type != JsonValue::Type::Object) {
+        return false;
+    }
+
+    const auto fieldIt = object.objectValue.find(key);
+    if (fieldIt == object.objectValue.end() || fieldIt->second.type != JsonValue::Type::String) {
+        return false;
+    }
+
+    value = fieldIt->second.stringValue;
+    return true;
+}
+
+bool JsonBoolField(const JsonValue& object, const std::string& key, bool& value) {
+    if (object.type != JsonValue::Type::Object) {
+        return false;
+    }
+
+    const auto fieldIt = object.objectValue.find(key);
+    if (fieldIt == object.objectValue.end() || fieldIt->second.type != JsonValue::Type::Bool) {
+        return false;
+    }
+
+    value = fieldIt->second.boolValue;
+    return true;
+}
+
+bool ParseIntegerText(const std::string& value, std::uint64_t& result) {
+    try {
+        result = std::stoull(value, nullptr, 0);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+std::string NormalizeModuleName(std::string module) {
+    if (module.empty()) {
+        return module;
+    }
+
+    const std::string lowerModule = ToLowerAscii(module);
+    if (lowerModule.size() < 4 || lowerModule.substr(lowerModule.size() - 4) != ".dll") {
+        module += ".dll";
+    }
+    return module;
+}
+
+void UpsertKnownOffset(std::vector<KnownOffsetInfo>& offsets, KnownOffsetInfo info) {
+    auto offsetIt = std::find_if(offsets.begin(), offsets.end(), [&](const KnownOffsetInfo& offset) {
+        return offset.module == info.module && offset.name == info.name;
+    });
+
+    if (offsetIt == offsets.end()) {
+        offsets.push_back(std::move(info));
+        return;
+    }
+
+    if (!offsetIt->found || info.source == "resolved_signature") {
+        *offsetIt = std::move(info);
+    }
+}
+
+std::optional<std::uint32_t> ResolveModuleRvaFromAddress(
+    const std::vector<ProcessModule>& modules,
+    const std::string& preferredModule,
+    std::uint64_t address,
+    std::string& moduleName
+) {
+    for (const ProcessModule& module : modules) {
+        const std::string currentName = WideToUtf8(module.name);
+        if (!preferredModule.empty() && ToLowerAscii(currentName) != ToLowerAscii(preferredModule)) {
+            continue;
+        }
+
+        const std::uint64_t base = static_cast<std::uint64_t>(module.base);
+        const std::uint64_t end = base + module.size;
+        if (address >= base && address < end) {
+            moduleName = currentName;
+            return static_cast<std::uint32_t>(address - base);
+        }
+    }
+
+    if (!preferredModule.empty()) {
+        return std::nullopt;
+    }
+
+    for (const ProcessModule& module : modules) {
+        const std::uint64_t base = static_cast<std::uint64_t>(module.base);
+        const std::uint64_t end = base + module.size;
+        if (address >= base && address < end) {
+            moduleName = WideToUtf8(module.name);
+            return static_cast<std::uint32_t>(address - base);
+        }
+    }
+
+    return std::nullopt;
+}
+
+size_t AddResolvedSignatureOffsets(ProcessMemoryReader& process, std::vector<KnownOffsetInfo>& offsets) {
+    const std::filesystem::path scanPath = "cs2_signatures.json";
+    if (!std::filesystem::exists(scanPath)) {
+        return 0;
+    }
+
+    std::ifstream file(scanPath);
+    std::stringstream stream;
+    stream << file.rdbuf();
+    const std::string jsonText = stream.str();
+
+    JsonValue root;
+    std::string error;
+    JsonReader reader(jsonText);
+    if (!reader.Parse(root, error) || root.type != JsonValue::Type::Object) {
+        return 0;
+    }
+
+    const auto signaturesIt = root.objectValue.find("signatures");
+    if (signaturesIt == root.objectValue.end() || signaturesIt->second.type != JsonValue::Type::Array) {
+        return 0;
+    }
+
+    const std::vector<ProcessModule> modules = process.GetModules();
+    size_t addedCount = 0;
+
+    for (const JsonValue& signature : signaturesIt->second.arrayValue) {
+        bool found = false;
+        if (!JsonBoolField(signature, "found", found) || !found) {
+            continue;
+        }
+
+        std::string name;
+        if (!JsonStringField(signature, "name", name) || name.empty()) {
+            continue;
+        }
+
+        std::string resultType = "absolute_address";
+        JsonStringField(signature, "result_type", resultType);
+        resultType = ToLowerAscii(resultType);
+
+        std::string module = "client.dll";
+        JsonStringField(signature, "module", module);
+        module = NormalizeModuleName(module);
+
+        std::uint64_t value = 0;
+        KnownOffsetInfo info;
+        info.module = module;
+        info.name = name;
+        info.found = true;
+        info.source = "resolved_signature";
+        info.resultType = resultType;
+
+        if (resultType == "field_offset") {
+            std::string fieldOffset;
+            if (!JsonStringField(signature, "field_offset", fieldOffset) &&
+                !JsonStringField(signature, "address", fieldOffset)) {
+                continue;
+            }
+            if (!ParseIntegerText(fieldOffset, value) || value > (std::numeric_limits<std::uint32_t>::max)()) {
+                continue;
+            }
+            info.rva = static_cast<std::uint32_t>(value);
+            UpsertKnownOffset(offsets, std::move(info));
+            ++addedCount;
+            continue;
+        }
+
+        std::string moduleRva;
+        if (JsonStringField(signature, "module_rva", moduleRva)) {
+            if (!ParseIntegerText(moduleRva, value) || value > (std::numeric_limits<std::uint32_t>::max)()) {
+                continue;
+            }
+            info.rva = static_cast<std::uint32_t>(value);
+            UpsertKnownOffset(offsets, std::move(info));
+            ++addedCount;
+            continue;
+        }
+
+        std::string address;
+        if (!JsonStringField(signature, "address", address) || !ParseIntegerText(address, value)) {
+            continue;
+        }
+
+        std::string resolvedModule = module;
+        const auto rva = ResolveModuleRvaFromAddress(modules, module, value, resolvedModule);
+        if (!rva) {
+            continue;
+        }
+
+        info.module = resolvedModule;
+        info.rva = *rva;
+        UpsertKnownOffset(offsets, std::move(info));
+        ++addedCount;
+    }
+
+    return addedCount;
+}
+
 std::vector<KnownOffsetInfo> ReadKnownOffsets(ProcessMemoryReader& process) {
     std::vector<KnownOffsetInfo> offsets;
     std::map<std::wstring, std::vector<std::uint8_t>> images;
@@ -1201,6 +1403,7 @@ std::vector<KnownOffsetInfo> ReadKnownOffsets(ProcessMemoryReader& process) {
     }
 
     AddDerivedOffsets(images, offsets);
+    AddResolvedSignatureOffsets(process, offsets);
     return offsets;
 }
 
@@ -1213,6 +1416,8 @@ void WriteOffsetsJson(const std::filesystem::path& outputPath, const std::vector
         file << "    {\n";
         file << "      \"module\": \"" << EscapeJson(offset.module) << "\",\n";
         file << "      \"name\": \"" << EscapeJson(offset.name) << "\",\n";
+        file << "      \"source\": \"" << EscapeJson(offset.source) << "\",\n";
+        file << "      \"result_type\": \"" << EscapeJson(offset.resultType) << "\",\n";
         file << "      \"found\": " << (offset.found ? "true" : "false") << ",\n";
         if (offset.found) {
             file << "      \"rva\": \"" << FormatHex(offset.rva) << "\",\n";

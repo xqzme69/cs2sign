@@ -58,6 +58,14 @@ uintptr_t ApplyAddressOffset(uintptr_t address, intptr_t offset) {
     return address + static_cast<uintptr_t>(offset);
 }
 
+uintptr_t ApplySignedOffset(uintptr_t address, std::int64_t offset) {
+    if (offset < 0) {
+        return address - static_cast<uintptr_t>(-offset);
+    }
+
+    return address + static_cast<uintptr_t>(offset);
+}
+
 std::string EffectiveImportance(const Signature& signature) {
     if (!signature.importance.empty()) {
         return signature.importance;
@@ -115,6 +123,113 @@ bool CompileMaskedPattern(
 
     return true;
 }
+
+bool ReadSignedOperand(
+    ProcessMemoryReader& memory,
+    uintptr_t address,
+    int size,
+    std::int64_t& value
+) {
+    switch (size) {
+        case 1: {
+            std::int8_t readValue = 0;
+            if (!memory.Read(address, readValue)) {
+                return false;
+            }
+            value = readValue;
+            return true;
+        }
+        case 2: {
+            std::int16_t readValue = 0;
+            if (!memory.Read(address, readValue)) {
+                return false;
+            }
+            value = readValue;
+            return true;
+        }
+        case 4: {
+            std::int32_t readValue = 0;
+            if (!memory.Read(address, readValue)) {
+                return false;
+            }
+            value = readValue;
+            return true;
+        }
+        case 8: {
+            std::int64_t readValue = 0;
+            if (!memory.Read(address, readValue)) {
+                return false;
+            }
+            value = readValue;
+            return true;
+        }
+        default:
+            return false;
+    }
+}
+
+std::string EffectiveResultType(const Signature& signature) {
+    if (!signature.resultType.empty()) {
+        return ToLowerAscii(signature.resultType);
+    }
+
+    if (!signature.resolver.resultType.empty()) {
+        return ToLowerAscii(signature.resolver.resultType);
+    }
+
+    const std::string resolverType = ToLowerAscii(signature.resolver.type);
+    if (resolverType == "instruction_displacement") {
+        return "field_offset";
+    }
+    if (resolverType == "rip_relative") {
+        return "absolute_address";
+    }
+    if (!signature.rva.empty()) {
+        return "function_address";
+    }
+    return "absolute_address";
+}
+
+void WriteResolverJSON(std::ofstream& file, const SignatureResolver& resolver) {
+    if (!resolver.enabled && resolver.type.empty()) {
+        return;
+    }
+
+    file << "      \"resolver\": {\n";
+
+    bool wrote = false;
+    const auto nextField = [&]() {
+        if (wrote) {
+            file << ",\n";
+        }
+        wrote = true;
+    };
+    const auto writeString = [&](const char* key, const std::string& value) {
+        if (value.empty()) {
+            return;
+        }
+        nextField();
+        file << "        \"" << key << "\": \"" << EscapeJson(value) << "\"";
+    };
+    const auto writeInt = [&](const char* key, std::int64_t value) {
+        nextField();
+        file << "        \"" << key << "\": " << value;
+    };
+
+    writeString("type", resolver.type);
+    writeString("result_type", resolver.resultType);
+    if (resolver.hasInstructionOffset) writeInt("instruction_offset", resolver.instructionOffset);
+    if (resolver.hasInstructionSize) writeInt("instruction_size", resolver.instructionSize);
+    if (resolver.hasOperandIndex) writeInt("operand_index", resolver.operandIndex);
+    if (resolver.hasOperandOffset) writeInt("operand_offset", resolver.operandOffset);
+    if (resolver.hasOperandSize) writeInt("operand_size", resolver.operandSize);
+    if (resolver.hasAdd) writeInt("add", resolver.add);
+    if (resolver.hasExpected) writeInt("expected", resolver.expected);
+    writeString("target_rva", resolver.targetRva);
+    writeString("formula", resolver.formula);
+
+    file << "\n      },\n";
+}
 }
 
 SignatureScanner::SignatureScanner(ProcessMemoryReader& memory)
@@ -139,7 +254,11 @@ void SignatureScanner::AddSignature(
     signature.confidence = 0;
     signature.sourceCount = 0;
     signature.required = true;
+    signature.matchAddress = 0;
     signature.resolvedAddress = 0;
+    signature.moduleRva = 0;
+    signature.hasModuleRva = false;
+    signature.resolverStatus = "not_applicable";
     signature.found = false;
     signature.error.clear();
     signature.regionsScanned = 0;
@@ -163,7 +282,11 @@ void SignatureScanner::AddSignature(
     signature.confidence = 0;
     signature.sourceCount = 0;
     signature.required = true;
+    signature.matchAddress = 0;
     signature.resolvedAddress = 0;
+    signature.moduleRva = 0;
+    signature.hasModuleRva = false;
+    signature.resolverStatus = "not_applicable";
     signature.found = false;
     signature.error.clear();
     signature.regionsScanned = 0;
@@ -195,7 +318,9 @@ void SignatureScanner::AddSignatureFromIDA(
     const std::string& source,
     const std::string& sourceProject,
     const std::string& sourceUrl,
-    bool required
+    bool required,
+    const SignatureResolver& resolver,
+    const std::string& resultType
 ) {
     std::string patternBytes;
     std::string patternMask;
@@ -218,11 +343,17 @@ void SignatureScanner::AddSignatureFromIDA(
     signature.source = source;
     signature.sourceProject = sourceProject;
     signature.sourceUrl = sourceUrl;
+    signature.resultType = resultType;
+    signature.resolver = resolver;
     signature.addressOffset = addressOffset;
     signature.confidence = confidence;
     signature.sourceCount = sourceCount;
     signature.required = required;
+    signature.matchAddress = 0;
     signature.resolvedAddress = 0;
+    signature.moduleRva = 0;
+    signature.hasModuleRva = false;
+    signature.resolverStatus = "not_applicable";
     signature.found = false;
     signature.error.clear();
     signature.regionsScanned = 0;
@@ -272,12 +403,16 @@ void SignatureScanner::ScanAll() {
         if (outcome.found) {
             RecordFoundSignature(signature, outcome);
             Console::ClearLine();
-            Console::PrintFound(
-                displayName,
-                signature.resolvedAddress,
-                signature.regionsScanned,
-                signature.bytesScanned
-            );
+            if (signature.found) {
+                Console::PrintFound(
+                    displayName,
+                    signature.resolvedAddress,
+                    signature.regionsScanned,
+                    signature.bytesScanned
+                );
+            } else {
+                Console::PrintNotFound(displayName, signature.error);
+            }
         } else {
             RecordMissingSignature(signature, outcome);
             Console::ClearLine();
@@ -297,7 +432,11 @@ void SignatureScanner::ScanAll() {
 
 void SignatureScanner::ResetSignatureState(Signature& signature) {
     signature.found = false;
+    signature.matchAddress = 0;
     signature.resolvedAddress = 0;
+    signature.moduleRva = 0;
+    signature.hasModuleRva = false;
+    signature.resolverStatus = signature.resolver.enabled ? "pending" : "not_applicable";
     signature.error.clear();
     signature.regionsScanned = 0;
     signature.bytesScanned = 0;
@@ -429,22 +568,142 @@ SignatureScanner::SignatureScanOutcome SignatureScanner::ScanSignatureRegions(
 }
 
 void SignatureScanner::RecordFoundSignature(Signature& signature, const SignatureScanOutcome& outcome) {
-    signature.found = true;
-    signature.resolvedAddress = ApplyAddressOffset(outcome.address, signature.addressOffset);
-    signature.error.clear();
+    signature.matchAddress = outcome.address;
     signature.regionsScanned = outcome.regionsScanned;
     signature.bytesScanned = outcome.bytesScanned;
+
+    if (!ResolveSignatureAddress(signature, outcome.address)) {
+        signature.found = false;
+        signature.resolvedAddress = 0;
+        signature.moduleRva = 0;
+        signature.hasModuleRva = false;
+        return;
+    }
+
+    signature.found = true;
+    signature.error.clear();
 }
 
 void SignatureScanner::RecordMissingSignature(Signature& signature, const SignatureScanOutcome& outcome) {
     signature.found = false;
+    signature.matchAddress = 0;
     signature.resolvedAddress = 0;
+    signature.moduleRva = 0;
+    signature.hasModuleRva = false;
+    signature.resolverStatus = "not_found";
     signature.regionsScanned = outcome.regionsScanned;
     signature.bytesScanned = outcome.bytesScanned;
 
     std::ostringstream errorMessage;
     errorMessage << "Not found after " << signature.regionsScanned << " regions";
     signature.error = errorMessage.str();
+}
+
+bool SignatureScanner::ResolveSignatureAddress(Signature& signature, uintptr_t matchAddress) {
+    const auto updateModuleRva = [&]() {
+        signature.moduleRva = 0;
+        signature.hasModuleRva = false;
+
+        const std::string resultType = EffectiveResultType(signature);
+        if (resultType == "field_offset" || signature.module.empty() || signature.resolvedAddress == 0) {
+            return;
+        }
+
+        std::string moduleName = signature.module;
+        const std::string lowerModuleName = ToLowerAscii(moduleName);
+        if (lowerModuleName.size() < 4 || lowerModuleName.substr(lowerModuleName.size() - 4) != ".dll") {
+            moduleName += ".dll";
+        }
+
+        ProcessModule module{};
+        if (!m_memory.GetModuleInfo(Utf8ToWide(moduleName), module)) {
+            return;
+        }
+
+        const uintptr_t moduleEnd = module.base + module.size;
+        if (signature.resolvedAddress < module.base || signature.resolvedAddress >= moduleEnd) {
+            return;
+        }
+
+        signature.moduleRva = static_cast<std::uint32_t>(signature.resolvedAddress - module.base);
+        signature.hasModuleRva = true;
+    };
+
+    const std::string resolverType = ToLowerAscii(signature.resolver.type);
+    if (!signature.resolver.enabled || resolverType.empty() || resolverType == "direct_match") {
+        signature.resolvedAddress = ApplyAddressOffset(matchAddress, signature.addressOffset);
+        signature.resolverStatus = signature.resolver.enabled ? "resolved" : "not_applicable";
+        updateModuleRva();
+        signature.error.clear();
+        return true;
+    }
+
+    if (!signature.resolver.hasOperandOffset || signature.resolver.operandOffset < 0) {
+        signature.resolverStatus = "failed";
+        signature.error = "Resolver missing operand_offset";
+        return false;
+    }
+
+    const int instructionOffset = signature.resolver.hasInstructionOffset
+        ? signature.resolver.instructionOffset
+        : 0;
+    if (instructionOffset < 0) {
+        signature.resolverStatus = "failed";
+        signature.error = "Resolver has negative instruction_offset";
+        return false;
+    }
+
+    const int operandSize = signature.resolver.hasOperandSize
+        ? signature.resolver.operandSize
+        : 4;
+
+    std::int64_t operandValue = 0;
+    const uintptr_t operandAddress =
+        matchAddress +
+        static_cast<uintptr_t>(instructionOffset) +
+        static_cast<uintptr_t>(signature.resolver.operandOffset);
+    if (!ReadSignedOperand(m_memory, operandAddress, operandSize, operandValue)) {
+        std::ostringstream errorMessage;
+        errorMessage << "Failed to read resolver operand at 0x"
+                     << std::hex << std::uppercase << operandAddress;
+        signature.resolverStatus = "failed";
+        signature.error = errorMessage.str();
+        return false;
+    }
+
+    if (resolverType == "rip_relative") {
+        const std::int64_t addValue = signature.resolver.hasAdd
+            ? signature.resolver.add
+            : signature.resolver.instructionSize;
+        const uintptr_t instructionAddress =
+            matchAddress + static_cast<uintptr_t>(instructionOffset);
+        signature.resolvedAddress = ApplySignedOffset(
+            ApplySignedOffset(instructionAddress, addValue),
+            operandValue
+        );
+        signature.resolverStatus = "resolved";
+        updateModuleRva();
+        signature.error.clear();
+        return true;
+    }
+
+    if (resolverType == "instruction_displacement") {
+        if (operandValue < 0) {
+            signature.resolverStatus = "failed";
+            signature.error = "Resolver produced a negative displacement";
+            return false;
+        }
+        signature.resolvedAddress = static_cast<uintptr_t>(operandValue);
+        signature.resolverStatus = "resolved";
+        signature.moduleRva = 0;
+        signature.hasModuleRva = false;
+        signature.error.clear();
+        return true;
+    }
+
+    signature.resolverStatus = "failed";
+    signature.error = "Unknown resolver type: " + signature.resolver.type;
+    return false;
 }
 
 uintptr_t SignatureScanner::ScanPattern(
@@ -597,9 +856,11 @@ void SignatureScanner::WriteResultsJSON(std::ofstream& file) {
         if (!signature.quality.empty()) {
             file << "      \"quality\": \"" << EscapeJson(signature.quality) << "\",\n";
         }
+        file << "      \"result_type\": \"" << EscapeJson(EffectiveResultType(signature)) << "\",\n";
         file << "      \"importance\": \"" << EscapeJson(EffectiveImportance(signature)) << "\",\n";
         file << "      \"required\": " << (signature.required ? "true" : "false") << ",\n";
         file << "      \"status\": \"" << SignatureStatus(signature) << "\",\n";
+        file << "      \"resolver_status\": \"" << EscapeJson(signature.resolverStatus) << "\",\n";
         if (signature.confidence > 0) {
             file << "      \"confidence\": " << signature.confidence << ",\n";
         }
@@ -615,14 +876,27 @@ void SignatureScanner::WriteResultsJSON(std::ofstream& file) {
         if (!signature.sourceUrl.empty()) {
             file << "      \"source_url\": \"" << EscapeJson(signature.sourceUrl) << "\",\n";
         }
+        WriteResolverJSON(file, signature.resolver);
         file << "      \"found\": " << (signature.found ? "true" : "false") << ",\n";
 
         if (signature.found) {
+            if (signature.matchAddress != 0 && signature.matchAddress != signature.resolvedAddress) {
+                file << "      \"match_address\": \"0x"
+                     << std::hex << std::uppercase << signature.matchAddress << "\",\n";
+            }
             file << "      \"address\": \"0x"
                  << std::hex << std::uppercase << signature.resolvedAddress << "\",\n";
+            if (signature.hasModuleRva) {
+                file << "      \"module_rva\": \"" << FormatHex(signature.moduleRva) << "\",\n";
+            }
+            if (EffectiveResultType(signature) == "field_offset") {
+                file << "      \"field_offset\": \"" << FormatHex(signature.resolvedAddress) << "\",\n";
+            }
             file << "      \"error\": null,\n";
         } else {
             file << "      \"address\": null,\n";
+            file << "      \"module_rva\": null,\n";
+            file << "      \"field_offset\": null,\n";
             file << "      \"error\": \"" << EscapeJson(signature.error) << "\",\n";
         }
 

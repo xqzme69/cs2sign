@@ -40,6 +40,15 @@ std::string LowerAscii(std::string value) {
     return value;
 }
 
+bool ParseIntegerString(const std::string& value, std::int64_t& result) {
+    try {
+        result = std::stoll(Trim(value), nullptr, 0);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
 bool ReadInteger(const JsonValue& value, std::int64_t& result) {
     if (value.type == JsonValue::Type::Number) {
         result = value.numberValue;
@@ -50,12 +59,7 @@ bool ReadInteger(const JsonValue& value, std::int64_t& result) {
         return false;
     }
 
-    try {
-        result = std::stoll(Trim(value.stringValue), nullptr, 0);
-        return true;
-    } catch (...) {
-        return false;
-    }
+    return ParseIntegerString(value.stringValue, result);
 }
 
 bool ReadBool(const JsonValue& value, bool& result) {
@@ -102,7 +106,9 @@ bool IsTextField(const std::string& key) {
            key == "source_project" ||
            key == "sourceProject" ||
            key == "source_url" ||
-           key == "sourceUrl";
+           key == "sourceUrl" ||
+           key == "result_type" ||
+           key == "resultType";
 }
 
 bool ConvertCodeStylePatternToIda(const std::string& codeStylePattern, std::string& idaPattern) {
@@ -201,6 +207,7 @@ void ApplyStringField(SignatureEntry& entry, const std::string& key, const std::
     else if (key == "source") entry.source = value;
     else if (key == "source_project" || key == "sourceProject") entry.sourceProject = value;
     else if (key == "source_url" || key == "sourceUrl") entry.sourceUrl = value;
+    else if (key == "result_type" || key == "resultType") entry.resultType = value;
 }
 
 void ApplyPatternField(
@@ -251,6 +258,77 @@ void ApplyNumberField(SignatureEntry& entry, const std::string& key, std::int64_
         entry.addressOffset = value;
     }
 }
+
+void ApplyResolverStringField(SignatureEntry::Resolver& resolver, const std::string& key, const std::string& value) {
+    if (key == "type") {
+        resolver.type = value;
+        resolver.enabled = !value.empty();
+    } else if (key == "result_type" || key == "resultType") {
+        resolver.resultType = value;
+    } else if (key == "target_rva" || key == "targetRva") {
+        resolver.targetRva = value;
+    } else if (key == "formula") {
+        resolver.formula = value;
+    } else if (key == "expected") {
+        std::int64_t numberValue = 0;
+        if (ParseIntegerString(value, numberValue)) {
+            resolver.expected = numberValue;
+            resolver.hasExpected = true;
+        }
+    }
+}
+
+void ApplyResolverNumberField(SignatureEntry::Resolver& resolver, const std::string& key, std::int64_t value) {
+    if (key == "instruction_offset" || key == "instructionOffset") {
+        resolver.instructionOffset = static_cast<int>(value);
+        resolver.hasInstructionOffset = true;
+    } else if (key == "instruction_size" || key == "instructionSize") {
+        resolver.instructionSize = static_cast<int>(value);
+        resolver.hasInstructionSize = true;
+    } else if (key == "operand_index" || key == "operandIndex") {
+        resolver.operandIndex = static_cast<int>(value);
+        resolver.hasOperandIndex = true;
+    } else if (key == "operand_offset" || key == "operandOffset") {
+        resolver.operandOffset = static_cast<int>(value);
+        resolver.hasOperandOffset = true;
+    } else if (key == "operand_size" || key == "operandSize") {
+        resolver.operandSize = static_cast<int>(value);
+        resolver.hasOperandSize = true;
+    } else if (key == "add") {
+        resolver.add = value;
+        resolver.hasAdd = true;
+    } else if (key == "expected") {
+        resolver.expected = value;
+        resolver.hasExpected = true;
+    }
+}
+
+void ApplyResolverField(SignatureEntry::Resolver& resolver, const std::string& key, const JsonValue& field) {
+    std::string stringValue;
+    if (ReadString(field, stringValue)) {
+        ApplyResolverStringField(resolver, key, stringValue);
+        std::int64_t numberValue = 0;
+        if (ReadInteger(field, numberValue)) {
+            ApplyResolverNumberField(resolver, key, numberValue);
+        }
+        return;
+    }
+
+    std::int64_t numberValue = 0;
+    if (ReadInteger(field, numberValue)) {
+        ApplyResolverNumberField(resolver, key, numberValue);
+    }
+}
+
+void ApplyResolverObject(SignatureEntry& entry, const JsonValue& value) {
+    if (value.type != JsonValue::Type::Object) {
+        return;
+    }
+
+    for (const auto& [key, field] : value.objectValue) {
+        ApplyResolverField(entry.resolver, key, field);
+    }
+}
 }
 
 bool JSONParser::LoadSignatures(
@@ -297,6 +375,11 @@ bool JSONParser::LoadSignatures(
         std::string maskValue;
 
         for (const auto& [key, field] : value.objectValue) {
+            if (key == "resolver") {
+                ApplyResolverObject(entry, field);
+                continue;
+            }
+
             std::string stringValue;
             if (ReadString(field, stringValue)) {
                 if (IsPatternField(key)) {

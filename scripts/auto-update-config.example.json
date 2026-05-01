@@ -20,6 +20,7 @@
   "max_consecutive_failures": 5,
   "require_all_modules": true,
   "create_github_release": false,
+  "max_signature_drop_percent": 80,
   "cleanup_idb": true,
   "log_retention_days": 30,
   "ida_priority": "BelowNormal",

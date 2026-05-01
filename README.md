@@ -140,11 +140,36 @@ Generate SDK files from an existing schema dump. CS2 does not need to be running
 
 Only `pattern` is required. `ida_pattern` is accepted as a fallback, and `code_style_pattern` is accepted when it uses `\xHH` bytes with `\x2A` wildcards. Add `module` whenever possible; it keeps scans focused. `address_offset` is used when the pattern starts inside a function and should resolve back to the entry point.
 
+Entries can also include a `resolver` object when the match should resolve to a referenced address or a field displacement instead of the match address:
+
+```json
+{
+  "dwEntityList": {
+    "pattern": "48 8B 0D ? ? ? ? 48 89 7C 24 ?",
+    "module": "client",
+    "result_type": "module_rva",
+    "resolver": {
+      "type": "rip_relative",
+      "result_type": "module_rva",
+      "instruction_offset": 0,
+      "instruction_size": 7,
+      "operand_offset": 3,
+      "operand_size": 4,
+      "add": 7
+    }
+  }
+}
+```
+
+Supported resolver types are `rip_relative`, `instruction_displacement`, and `direct_match`. Supported result types are `absolute_address`, `module_rva`, `field_offset`, and `function_address`.
+
 `category`, `importance`, and `required` feed the update report. `game` and `module` signatures count as required unless the JSON says otherwise. `library`, `runtime`, `thunk`, and `auto` signatures count as optional.
 
 ## Output
 
-Signature scan results are written to `cs2_signatures.json` in the current working directory. Each result includes `status`, `importance`, `required`, `ida_pattern`, and `code_style_pattern` so the dump can be reviewed or copied into C++ code more easily.
+Signature scan results are written to `cs2_signatures.json` in the current working directory. Each result includes `status`, `importance`, `required`, `ida_pattern`, `code_style_pattern`, `result_type`, and `resolver_status` so the dump can be reviewed or copied into C++ code more easily.
+
+When read-only offset dumping runs after a signature scan, resolved signature results are imported into `dump\offsets.json`. RIP-relative results are stored as module RVAs when the target address belongs to a loaded module. `instruction_displacement` results are stored as field offsets.
 
 Every run writes `dump\update_report.json` with signature health, dumper status, SDK status, build number when available, and loaded modules.
 
@@ -173,6 +198,7 @@ Those files are generated output and are ignored by git.
 - Generated build artifacts such as `x64/`, `Win32/`, `compiled/`, `.exe`, `.pdb`, `.obj`, and `.tlog` files are ignored by git.
 - The IDA plugin lives in `tools/ida/`.
 - GitHub mode uses `signatures/index.json` and the matching `signatures/*_signatures.json` files.
+- `scripts\compare-signatures.ps1` compares a candidate signature pack against the current published pack and fails on suspicious drops.
 - License and third-party notices are tracked in [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Limitations

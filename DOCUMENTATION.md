@@ -102,6 +102,31 @@ Automatically uses the input filename (e.g., `client.dll` -> `client`, `engine2.
 
 `rva` is the function entry RVA. `pattern_rva` is where the byte pattern starts. `address_offset` is applied by the C++ scanner to resolve an interior match back to the function entry. The scanner accepts `pattern`, `ida_pattern`, or `code_style_pattern` as the source pattern.
 
+For signatures generated from offset references, add a `resolver` object:
+
+```json
+{
+  "dwEntityList": {
+    "pattern": "48 8B 0D ? ? ? ? 48 89 7C 24 ?",
+    "module": "client",
+    "result_type": "module_rva",
+    "resolver": {
+      "type": "rip_relative",
+      "result_type": "module_rva",
+      "instruction_offset": 0,
+      "instruction_size": 7,
+      "operand_offset": 3,
+      "operand_size": 4,
+      "add": 7
+    }
+  }
+}
+```
+
+`rip_relative` resolves `match + add + displacement`. `instruction_displacement` reads the operand displacement and reports that value, which is useful for field offsets. `direct_match` keeps the old match-address behavior. `result_type` can be `absolute_address`, `module_rva`, `field_offset`, or `function_address`.
+
+When read-only offset dumping runs after a signature scan, resolved results from `cs2_signatures.json` are merged into `dump\offsets.json`. Module addresses are converted to RVAs when the module is loaded; field displacements are emitted as field offsets.
+
 `category`, `importance`, and `required` feed scanner health. `game` and `module` are required unless the JSON says otherwise. `library`, `runtime`, `thunk`, and `auto` are optional.
 
 **Hotkey:** Ctrl-Shift-S (when loaded as IDA plugin)
