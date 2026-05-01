@@ -577,6 +577,8 @@ When Counter-Strike 2 receives an update, function addresses and byte patterns c
    - `CS2SIG_HEADLESS=1` exits IDA with a process exit code after script completion.
    - `CS2SIG_NO_CPP=1`, `CS2SIG_NO_REPORT=1`, and `CS2SIG_NO_MANIFEST=1` keep automated runs JSON-only.
    - `.\scripts\auto-update.ps1 -Preflight` checks local paths, DLLs, Steam build lookup, and Git auth without running IDA.
+   - In `local_steam` mode, auto-update stores a fingerprint of `steam.inf` and target DLL timestamps/sizes, then waits for that fingerprint to change before analyzing a new Steam API build.
+   - Before each module analysis, auto-update removes old IDA database files from the work directory so IDA starts from the updated DLL.
 
 3. Run `.\scripts\update-signatures.ps1` from the repository root to copy generated files into `signatures\` and refresh `signatures\index.json`
 

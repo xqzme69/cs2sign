@@ -14,6 +14,8 @@
   "work_dir": "",
 
   "update_wait_seconds": 1200,
+  "local_update_timeout_seconds": 7200,
+  "local_update_poll_seconds": 60,
   "ida_timeout_seconds": 1800,
   "download_attempts": 3,
   "push_attempts": 3,

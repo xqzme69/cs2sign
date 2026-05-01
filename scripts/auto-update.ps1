@@ -73,6 +73,8 @@ $DepotPath = Cfg "depot_path"          ""
 $RepoPath = Cfg "repo_path"           (Resolve-Path (Join-Path $ScriptDir "..")).Path
 $WorkDir = Cfg "work_dir"            (Join-Path $env:LOCALAPPDATA "cs2sign-auto")
 $UpdateWaitSec = Cfg "update_wait_seconds" 900
+$LocalUpdateTimeoutSec = Cfg "local_update_timeout_seconds" 7200
+$LocalUpdatePollSec = Cfg "local_update_poll_seconds" 60
 $IdaTimeoutSec = Cfg "ida_timeout_seconds" 1800
 $DownloadAttempts = Cfg "download_attempts"   3
 $PushAttempts = Cfg "push_attempts"       3
@@ -174,7 +176,22 @@ function Read-State {
 }
 
 function Save-State($state) {
-    $state | ConvertTo-Json -Depth 4 | Set-Content $StatePath -Encoding UTF8
+    $state | ConvertTo-Json -Depth 8 | Set-Content $StatePath -Encoding UTF8
+}
+
+function Get-StateValue($state, [string]$Name, $Default = $null) {
+    $prop = $state.PSObject.Properties[$Name]
+    if ($null -eq $prop) { return $Default }
+    return $prop.Value
+}
+
+function Set-StateValue($state, [string]$Name, $Value) {
+    if ($null -eq $state.PSObject.Properties[$Name]) {
+        $state | Add-Member -NotePropertyName $Name -NotePropertyValue $Value
+    }
+    else {
+        $state.$Name = $Value
+    }
 }
 
 # Steam API
@@ -273,6 +290,113 @@ function Get-DllPath([string]$DllRel) {
     }
 }
 
+function Get-LocalInstallSnapshot {
+    if ($DllSource -ne "local_steam" -or -not $SteamLibrary) {
+        return $null
+    }
+
+    $steamInf = Join-Path $SteamLibrary "game\csgo\steam.inf"
+    $snapshot = [ordered]@{
+        steam_inf_path           = $steamInf
+        steam_inf_last_write_utc = ""
+        client_version           = ""
+        server_version           = ""
+        patch_version            = ""
+        source_revision          = ""
+        modules                  = [ordered]@{}
+    }
+
+    if (Test-Path $steamInf) {
+        $steamInfItem = Get-Item $steamInf
+        $snapshot.steam_inf_last_write_utc = $steamInfItem.LastWriteTimeUtc.ToString("o")
+
+        $content = Get-Content $steamInf -Raw
+        foreach ($line in ($content -split "`r?`n")) {
+            if ($line -notmatch "^([^=]+)=(.*)$") { continue }
+            $key = $Matches[1].Trim()
+            $value = $Matches[2].Trim()
+            switch ($key) {
+                "ClientVersion"  { $snapshot.client_version = $value }
+                "ServerVersion"  { $snapshot.server_version = $value }
+                "PatchVersion"   { $snapshot.patch_version = $value }
+                "SourceRevision" { $snapshot.source_revision = $value }
+            }
+        }
+    }
+
+    foreach ($mod in $Modules) {
+        $path = Get-DllPath $mod.dll_rel
+        if (Test-Path $path) {
+            $item = Get-Item $path
+            $snapshot.modules[$mod.name] = [ordered]@{
+                path           = $path
+                length         = [int64]$item.Length
+                last_write_utc = $item.LastWriteTimeUtc.ToString("o")
+            }
+        }
+        else {
+            $snapshot.modules[$mod.name] = [ordered]@{
+                path           = $path
+                length         = 0
+                last_write_utc = ""
+            }
+        }
+    }
+
+    return [PSCustomObject]$snapshot
+}
+
+function ConvertTo-SnapshotKey($Snapshot) {
+    if ($null -eq $Snapshot) { return "" }
+    return ($Snapshot | ConvertTo-Json -Depth 8 -Compress)
+}
+
+function Test-LocalInstallChanged($OldSnapshot, $NewSnapshot) {
+    if ($null -eq $OldSnapshot -or $null -eq $NewSnapshot) {
+        return $true
+    }
+
+    return (ConvertTo-SnapshotKey $OldSnapshot) -ne (ConvertTo-SnapshotKey $NewSnapshot)
+}
+
+function Save-CurrentLocalInstallSnapshot($state) {
+    $snapshot = Get-LocalInstallSnapshot
+    if ($null -eq $snapshot) { return }
+
+    Set-StateValue $state "local_install_snapshot" $snapshot
+    Save-State $state
+    Write-Log "Local CS2 install snapshot saved."
+}
+
+function Wait-LocalSteamInstallReady([int]$BuildId, $state) {
+    if ($DllSource -ne "local_steam") {
+        return $true
+    }
+
+    $previousSnapshot = Get-StateValue $state "local_install_snapshot" $null
+    if ($null -eq $previousSnapshot) {
+        Write-Log "No previous local install snapshot; continuing after DLL availability check." "WARN"
+        return $true
+    }
+
+    $pollSec = [Math]::Max(10, [int]$LocalUpdatePollSec)
+    $deadline = (Get-Date).AddSeconds([Math]::Max($pollSec, [int]$LocalUpdateTimeoutSec))
+
+    while ((Get-Date) -lt $deadline) {
+        $currentSnapshot = Get-LocalInstallSnapshot
+        if (Test-LocalInstallChanged $previousSnapshot $currentSnapshot) {
+            Write-Log "Local CS2 install changed; build $BuildId can be processed."
+            return $true
+        }
+
+        Write-Log "Local CS2 install has not changed yet for build $BuildId. Waiting $pollSec seconds..." "WARN"
+        Start-Sleep -Seconds $pollSec
+    }
+
+    Write-Log "Local CS2 install did not change before timeout; will retry on the next scheduled run." "WARN"
+    return $false
+}
+
 function Invoke-SteamCmdDownload {
     if ($DllSource -ne "steamcmd") { return $true }
 
@@ -322,6 +446,22 @@ function Test-DllsAvailable {
         Write-Log "DLL OK: $($mod.name) ($([math]::Round($size / 1MB, 1)) MB)"
     }
     return $allOk
+}
+
+function Clear-ModuleIdbFiles([string]$ModuleName) {
+    $extensions = @(".idb", ".i64", ".id0", ".id1", ".id2", ".nam", ".til")
+    $removed = 0
+
+    Get-ChildItem $IdbDir -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.BaseName -eq $ModuleName -and $extensions -contains $_.Extension.ToLowerInvariant() } |
+    ForEach-Object {
+        Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue
+        $removed++
+    }
+
+    if ($removed -gt 0) {
+        Write-Log "$ModuleName`: removed $removed old IDA database file(s)"
+    }
 }
 
 function Invoke-Preflight {
@@ -451,6 +591,7 @@ function Invoke-IdaBatch {
         }
 
         $idbPath = Join-Path $IdbDir "$($mod.name).idb"
+        Clear-ModuleIdbFiles $mod.name
         Write-Log "IDA analyzing $($mod.name)..."
 
         $startTime = Get-Date
@@ -783,6 +924,9 @@ function Invoke-Pipeline {
 
         if (-not $Force -and $currentBuild -le $state.last_buildid) {
             Write-Log "Build $currentBuild is current (last: $($state.last_buildid)), nothing to do."
+            if ($DllSource -eq "local_steam" -and $null -eq (Get-StateValue $state "local_install_snapshot" $null)) {
+                Save-CurrentLocalInstallSnapshot $state
+            }
             return 0
         }
 
@@ -804,15 +948,11 @@ function Invoke-Pipeline {
                 return 1
             }
 
-            if (-not $Force -and $localBuild -lt $currentBuild) {
-                Write-Log "Local CS2 build $localBuild is older than Steam API build $currentBuild" "ERROR"
-                $state.consecutive_failures++
-                Save-State $state
-                Send-DiscordNotification "Build $currentBuild`: local CS2 is still at build $localBuild." 16776960
-                return 1
-            }
+            Write-Log "Local CS2 steam.inf version: $localBuild"
 
-            Write-Log "Local CS2 build verified: $localBuild"
+            if (-not $Force -and -not (Wait-LocalSteamInstallReady $currentBuild $state)) {
+                return 0
+            }
         }
 
         # Download DLLs if using SteamCMD
@@ -897,6 +1037,9 @@ function Invoke-Pipeline {
         $state.last_status = $historyEntry.status
         $state.consecutive_failures = 0
         $state.history = $history
+        if ($DllSource -eq "local_steam") {
+            Set-StateValue $state "local_install_snapshot" (Get-LocalInstallSnapshot)
+        }
         Save-State $state
 
         # Notify

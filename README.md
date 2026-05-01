@@ -120,6 +120,8 @@ Check local auto-update setup without running IDA:
 .\scripts\auto-update.ps1 -Preflight
 ```
 
+In `local_steam` mode the updater stores a fingerprint of `steam.inf` and the target DLLs. When Steam reports a new build, it waits for the local install fingerprint to change before running IDA. Old IDA database files in the auto-update work directory are deleted before each module is analyzed.
+
 ## Input Format
 
 `*_signatures.json` entries are expected to look like this:
