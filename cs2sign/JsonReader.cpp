@@ -1,6 +1,8 @@
 #include "JsonReader.h"
 
 #include <cctype>
+#include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 
@@ -69,7 +71,7 @@ bool JsonReader::ParseValue(JsonValue& value) {
     }
     if (current == '-' || std::isdigit(static_cast<unsigned char>(current))) {
         value.type = JsonValue::Type::Number;
-        return ParseNumber(value.numberValue);
+        return ParseNumber(value);
     }
     if (MatchLiteral("true")) {
         value.type = JsonValue::Type::Bool;
@@ -143,24 +145,87 @@ bool JsonReader::ParseString(std::string& value) {
     return false;
 }
 
-bool JsonReader::ParseNumber(std::int64_t& value) {
+bool JsonReader::ParseNumber(JsonValue& value) {
     const size_t start = position_;
     if (input_[position_] == '-') {
         ++position_;
     }
 
-    while (position_ < input_.size() &&
-           std::isdigit(static_cast<unsigned char>(input_[position_]))) {
-        ++position_;
-    }
-
-    if (position_ < input_.size() && input_[position_] == '.') {
-        error_ = "floating point numbers are not supported";
+    if (position_ >= input_.size() ||
+        !std::isdigit(static_cast<unsigned char>(input_[position_]))) {
+        error_ = "invalid number";
         return false;
     }
 
+    if (input_[position_] == '0') {
+        ++position_;
+    } else {
+        while (position_ < input_.size() &&
+               std::isdigit(static_cast<unsigned char>(input_[position_]))) {
+            ++position_;
+        }
+    }
+
+    bool isInteger = true;
+    if (position_ < input_.size() && input_[position_] == '.') {
+        isInteger = false;
+        ++position_;
+
+        if (position_ >= input_.size() ||
+            !std::isdigit(static_cast<unsigned char>(input_[position_]))) {
+            error_ = "invalid number";
+            return false;
+        }
+
+        while (position_ < input_.size() &&
+               std::isdigit(static_cast<unsigned char>(input_[position_]))) {
+            ++position_;
+        }
+    }
+
+    if (position_ < input_.size() && (input_[position_] == 'e' || input_[position_] == 'E')) {
+        isInteger = false;
+        ++position_;
+
+        if (position_ < input_.size() && (input_[position_] == '+' || input_[position_] == '-')) {
+            ++position_;
+        }
+
+        if (position_ >= input_.size() ||
+            !std::isdigit(static_cast<unsigned char>(input_[position_]))) {
+            error_ = "invalid number";
+            return false;
+        }
+
+        while (position_ < input_.size() &&
+               std::isdigit(static_cast<unsigned char>(input_[position_]))) {
+            ++position_;
+        }
+    }
+
+    const std::string numberText(input_.substr(start, position_ - start));
     try {
-        value = std::stoll(std::string(input_.substr(start, position_ - start)));
+        value.numberIsInteger = isInteger;
+        if (isInteger) {
+            value.numberValue = std::stoll(numberText);
+            value.numberFloatValue = static_cast<double>(value.numberValue);
+            return true;
+        }
+
+        const long double parsed = std::stold(numberText);
+        if (!std::isfinite(parsed)) {
+            error_ = "invalid number";
+            return false;
+        }
+
+        value.numberFloatValue = static_cast<double>(parsed);
+        if (parsed >= static_cast<long double>(std::numeric_limits<std::int64_t>::min()) &&
+            parsed <= static_cast<long double>(std::numeric_limits<std::int64_t>::max()) &&
+            std::trunc(parsed) == parsed) {
+            value.numberValue = static_cast<std::int64_t>(parsed);
+        } else {
+            value.numberValue = 0;
+        }
         return true;
     } catch (...) {
         error_ = "invalid number";
