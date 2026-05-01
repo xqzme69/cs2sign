@@ -576,6 +576,7 @@ When Counter-Strike 2 receives an update, function addresses and byte patterns c
    - Headless runs can set `CS2SIG_OUTPUT_DIR` to choose the output folder.
    - `CS2SIG_HEADLESS=1` exits IDA with a process exit code after script completion.
    - `CS2SIG_NO_CPP=1`, `CS2SIG_NO_REPORT=1`, and `CS2SIG_NO_MANIFEST=1` keep automated runs JSON-only.
+   - `.\scripts\auto-update.ps1 -Preflight` checks local paths, DLLs, Steam build lookup, and Git auth without running IDA.
 
 3. Run `.\scripts\update-signatures.ps1` from the repository root to copy generated files into `signatures\` and refresh `signatures\index.json`
 

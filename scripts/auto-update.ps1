@@ -22,13 +22,17 @@
 
 .PARAMETER DryRun
     Run all steps except git push, release creation, and Discord notification.
+
+.PARAMETER Preflight
+    Validate local paths, DLL availability, Steam build lookup, and Git auth without running IDA.
 #>
 
 [CmdletBinding()]
 param(
     [string]$ConfigPath,
     [switch]$Force,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$Preflight
 )
 
 Set-StrictMode -Version Latest
@@ -228,15 +232,19 @@ function Invoke-GitChecked {
 
     $oldGitPrompt = $env:GIT_TERMINAL_PROMPT
     $oldGcmInteractive = $env:GCM_INTERACTIVE
+    $oldErrorActionPreference = $ErrorActionPreference
 
     try {
         $env:GIT_TERMINAL_PROMPT = "0"
         $env:GCM_INTERACTIVE = "never"
+        $ErrorActionPreference = "Continue"
 
         & git @Arguments 2>&1 | ForEach-Object { Write-Log "git: $_" }
         return ($LASTEXITCODE -eq 0)
     }
     finally {
+        $ErrorActionPreference = $oldErrorActionPreference
+
         if ($null -eq $oldGitPrompt) {
             Remove-Item Env:GIT_TERMINAL_PROMPT -ErrorAction SilentlyContinue
         }
@@ -314,6 +322,105 @@ function Test-DllsAvailable {
         Write-Log "DLL OK: $($mod.name) ($([math]::Round($size / 1MB, 1)) MB)"
     }
     return $allOk
+}
+
+function Invoke-Preflight {
+    Start-Logging
+
+    try {
+        $failures = 0
+        Write-Log "Preflight mode: no IDA analysis, no signature update, no git push."
+
+        if (Test-Path $IdaFullPath) {
+            Write-Log "IDA OK: $IdaFullPath"
+        }
+        else {
+            Write-Log "IDA not found: $IdaFullPath" "ERROR"
+            $failures++
+        }
+
+        if (Test-Path $IdaScriptFull) {
+            Write-Log "IDA script OK: $IdaScriptFull"
+        }
+        else {
+            Write-Log "IDA script not found: $IdaScriptFull" "ERROR"
+            $failures++
+        }
+
+        if (Test-Path $RepoPath) {
+            Write-Log "Repository OK: $RepoPath"
+        }
+        else {
+            Write-Log "Repository not found: $RepoPath" "ERROR"
+            $failures++
+        }
+
+        $currentBuild = Get-CurrentBuildId
+        if ($currentBuild -gt 0) {
+            Write-Log "Current Steam build: $currentBuild"
+        }
+        else {
+            Write-Log "Current Steam build could not be resolved" "WARN"
+        }
+
+        if ($DllSource -eq "local_steam") {
+            $localBuild = Get-LocalSteamBuildId
+            if ($localBuild -gt 0) {
+                Write-Log "Local CS2 build: $localBuild"
+            }
+            else {
+                Write-Log "Local CS2 build could not be resolved from steam.inf" "ERROR"
+                $failures++
+            }
+        }
+        elseif ($DllSource -eq "steamcmd") {
+            if ($SteamcmdPath -and (Test-Path $SteamcmdPath)) {
+                Write-Log "SteamCMD OK: $SteamcmdPath"
+            }
+            else {
+                Write-Log "SteamCMD not found: $SteamcmdPath" "ERROR"
+                $failures++
+            }
+        }
+
+        if (-not (Test-DllsAvailable)) {
+            $failures++
+        }
+
+        if (Test-Path $RepoPath) {
+            Push-Location $RepoPath
+            try {
+                if (-not (Invoke-GitChecked @("status", "--short", "--branch"))) {
+                    Write-Log "git status failed" "ERROR"
+                    $failures++
+                }
+
+                if (-not (Invoke-GitChecked @("push", "--dry-run", "origin", "main"))) {
+                    Write-Log "git push --dry-run failed" "ERROR"
+                    $failures++
+                }
+            }
+            finally {
+                Pop-Location
+            }
+        }
+
+        if ($failures -gt 0) {
+            Write-Log "Preflight failed: $failures issue(s)" "ERROR"
+            return 1
+        }
+
+        Write-Log "Preflight passed"
+        return 0
+    }
+    catch {
+        Write-Log "Preflight error: $_" "ERROR"
+        Write-Log $_.ScriptStackTrace "ERROR"
+        return 1
+    }
+    finally {
+        Stop-Logging
+    }
 }
 
 # IDA batch
@@ -834,5 +941,5 @@ function Invoke-Pipeline {
 
 # Entry point
 
-$exitCode = Invoke-Pipeline
+$exitCode = if ($Preflight) { Invoke-Preflight } else { Invoke-Pipeline }
 exit $exitCode
