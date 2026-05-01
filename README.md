@@ -114,14 +114,6 @@ Generate SDK files from an existing schema dump. CS2 does not need to be running
 
 Headless IDA runs can set `CS2SIG_OUTPUT_DIR` to choose where `*_signatures.json` files are written. Set `CS2SIG_HEADLESS=1` to exit IDA with a process exit code after the script finishes. Set `CS2SIG_NO_CPP=1`, `CS2SIG_NO_REPORT=1`, and `CS2SIG_NO_MANIFEST=1` for JSON-only automation.
 
-Check local auto-update setup without running IDA:
-
-```powershell
-.\scripts\auto-update.ps1 -Preflight
-```
-
-In `local_steam` mode the updater stores a fingerprint of `steam.inf` and the target DLLs. When Steam reports a new build, it waits for the local install fingerprint to change before running IDA. Old IDA database files in the auto-update work directory are deleted before each module is analyzed.
-
 ## Input Format
 
 `*_signatures.json` entries are expected to look like this:

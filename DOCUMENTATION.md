@@ -556,9 +556,9 @@ This is a ~40x performance improvement for module-specific signatures.
 
 ---
 
-## Workflow After CS2 Update
+## Maintainer Workflow After CS2 Update
 
-When Counter-Strike 2 receives an update, function addresses and byte patterns change. To update signatures:
+When Counter-Strike 2 receives an update, function addresses and byte patterns change. End users do not need this workflow: the executable normally downloads the published GitHub signature pack. This section is for maintainers or contributors regenerating `signatures/`.
 
 ### Quick Update (Recommended)
 
@@ -576,13 +576,10 @@ When Counter-Strike 2 receives an update, function addresses and byte patterns c
    - Headless runs can set `CS2SIG_OUTPUT_DIR` to choose the output folder.
    - `CS2SIG_HEADLESS=1` exits IDA with a process exit code after script completion.
    - `CS2SIG_NO_CPP=1`, `CS2SIG_NO_REPORT=1`, and `CS2SIG_NO_MANIFEST=1` keep automated runs JSON-only.
-   - `.\scripts\auto-update.ps1 -Preflight` checks local paths, DLLs, Steam build lookup, and Git auth without running IDA.
-   - In `local_steam` mode, auto-update stores a fingerprint of `steam.inf` and target DLL timestamps/sizes, then waits for that fingerprint to change before analyzing a new Steam API build.
-   - Before each module analysis, auto-update removes old IDA database files from the work directory so IDA starts from the updated DLL.
 
 3. Run `.\scripts\update-signatures.ps1` from the repository root to copy generated files into `signatures\` and refresh `signatures\index.json`
 
-4. Commit and push the refreshed `signatures\` directory
+4. Maintainers can commit and publish the refreshed `signatures\` directory
 
 5. Run `cs2sign.exe` and choose GitHub signatures, or choose Local mode for files placed next to the executable
 
@@ -612,7 +609,7 @@ Re-run IDA plugin on updated DLLs, or use migration mode with the previous manif
 New *_signatures.json files generated
     |
     v
-Refresh signatures/index.json and push signatures/
+Refresh signatures/index.json and publish signatures/
     |
     v
 Scanner downloads the new pack; update_report.json shows remaining failures
