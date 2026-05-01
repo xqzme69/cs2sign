@@ -34,10 +34,10 @@ MIN_FIXED_BYTES = 4
 LIMIT = 0
 
 OUTPUT_JSON = True
-OUTPUT_CPP = True
-OUTPUT_REPORT = True
-OUTPUT_MANIFEST = True
-OUTPUT_DIR = ""
+OUTPUT_CPP = not env_flag("CS2SIG_NO_CPP", False)
+OUTPUT_REPORT = not env_flag("CS2SIG_NO_REPORT", False)
+OUTPUT_MANIFEST = not env_flag("CS2SIG_NO_MANIFEST", False)
+OUTPUT_DIR = os.environ.get("CS2SIG_OUTPUT_DIR", "")
 ALLOW_INTERIOR_PATTERNS = True
 PROBE_LENGTHS = (6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 160, 200)
 EXTEND_UNIQUE_PATTERNS = True
@@ -1643,4 +1643,13 @@ if __name__ == "__main__":
     print("=" * 60)
     print(f"  {PLUGIN_NAME} (script mode)")
     print("=" * 60)
-    dump_signatures()
+    if env_flag("CS2SIG_HEADLESS", False):
+        try:
+            result = dump_signatures()
+            exit_code = 0 if result else 1
+        except Exception:
+            traceback.print_exc()
+            exit_code = 1
+        idc.qexit(exit_code)
+    else:
+        dump_signatures()

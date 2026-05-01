@@ -573,6 +573,9 @@ When Counter-Strike 2 receives an update, function addresses and byte patterns c
 
 2. Run the plugin (Ctrl-Shift-S) on each DLL
    - Produces: `client_signatures.json`, `engine2_signatures.json`, etc.
+   - Headless runs can set `CS2SIG_OUTPUT_DIR` to choose the output folder.
+   - `CS2SIG_HEADLESS=1` exits IDA with a process exit code after script completion.
+   - `CS2SIG_NO_CPP=1`, `CS2SIG_NO_REPORT=1`, and `CS2SIG_NO_MANIFEST=1` keep automated runs JSON-only.
 
 3. Run `.\scripts\update-signatures.ps1` from the repository root to copy generated files into `signatures\` and refresh `signatures\index.json`
 

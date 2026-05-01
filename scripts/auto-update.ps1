@@ -226,8 +226,31 @@ function Get-LocalSteamBuildId {
 function Invoke-GitChecked {
     param([Parameter(Mandatory = $true)][string[]]$Arguments)
 
-    & git @Arguments 2>&1 | ForEach-Object { Write-Log "git: $_" }
-    return ($LASTEXITCODE -eq 0)
+    $oldGitPrompt = $env:GIT_TERMINAL_PROMPT
+    $oldGcmInteractive = $env:GCM_INTERACTIVE
+
+    try {
+        $env:GIT_TERMINAL_PROMPT = "0"
+        $env:GCM_INTERACTIVE = "never"
+
+        & git @Arguments 2>&1 | ForEach-Object { Write-Log "git: $_" }
+        return ($LASTEXITCODE -eq 0)
+    }
+    finally {
+        if ($null -eq $oldGitPrompt) {
+            Remove-Item Env:GIT_TERMINAL_PROMPT -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:GIT_TERMINAL_PROMPT = $oldGitPrompt
+        }
+
+        if ($null -eq $oldGcmInteractive) {
+            Remove-Item Env:GCM_INTERACTIVE -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:GCM_INTERACTIVE = $oldGcmInteractive
+        }
+    }
 }
 
 # DLL source
@@ -307,6 +330,7 @@ function Invoke-IdaBatch {
     $results = @()
 
     $env:CS2SIG_OUTPUT_DIR = $IdaOutDir
+    $env:CS2SIG_HEADLESS = "1"
     $env:CS2SIG_NO_CPP = "1"
     $env:CS2SIG_NO_REPORT = "1"
     $env:CS2SIG_NO_MANIFEST = "1"
@@ -379,6 +403,7 @@ function Invoke-IdaBatch {
     }
 
     Remove-Item Env:CS2SIG_OUTPUT_DIR  -ErrorAction SilentlyContinue
+    Remove-Item Env:CS2SIG_HEADLESS    -ErrorAction SilentlyContinue
     Remove-Item Env:CS2SIG_NO_CPP      -ErrorAction SilentlyContinue
     Remove-Item Env:CS2SIG_NO_REPORT   -ErrorAction SilentlyContinue
     Remove-Item Env:CS2SIG_NO_MANIFEST -ErrorAction SilentlyContinue
@@ -538,7 +563,10 @@ function New-GitHubRelease([int]$BuildId, [hashtable[]]$Results) {
     $notes += "Modules: $successModules/$($Results.Count) successful, $totalSigs total signatures.`n"
     $notes += "Generated at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC' -AsUTC)."
 
+    $oldGhPrompt = $env:GH_PROMPT_DISABLED
     try {
+        $env:GH_PROMPT_DISABLED = "1"
+
         gh release create $tag --title $title --notes $notes --latest 2>&1 | ForEach-Object { Write-Log "gh: $_" }
         if ($LASTEXITCODE -eq 0) {
             Write-Log "GitHub release $tag created"
@@ -549,6 +577,14 @@ function New-GitHubRelease([int]$BuildId, [hashtable[]]$Results) {
     }
     catch {
         Write-Log "GitHub release creation failed: $_" "WARN"
+    }
+    finally {
+        if ($null -eq $oldGhPrompt) {
+            Remove-Item Env:GH_PROMPT_DISABLED -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:GH_PROMPT_DISABLED = $oldGhPrompt
+        }
     }
 }
 

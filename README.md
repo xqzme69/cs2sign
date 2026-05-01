@@ -112,6 +112,8 @@ Generate SDK files from an existing schema dump. CS2 does not need to be running
 .\cs2sign\x64\Release\cs2sign.exe --no-signatures --emit-sdk --output .\dump --no-pause
 ```
 
+Headless IDA runs can set `CS2SIG_OUTPUT_DIR` to choose where `*_signatures.json` files are written. Set `CS2SIG_HEADLESS=1` to exit IDA with a process exit code after the script finishes. Set `CS2SIG_NO_CPP=1`, `CS2SIG_NO_REPORT=1`, and `CS2SIG_NO_MANIFEST=1` for JSON-only automation.
+
 ## Input Format
 
 `*_signatures.json` entries are expected to look like this:
