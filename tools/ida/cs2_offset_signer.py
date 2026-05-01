@@ -23,6 +23,8 @@ try:
 except NameError:
     SCRIPT_DIR = OUTPUT_DIR
 
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
+
 
 MAX_PATTERN_BYTES = 256
 PROBE_LENGTHS = (8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96, 128, 160, 200, 256)
@@ -57,6 +59,15 @@ def clean_name(value):
     return str(value).strip()
 
 
+def normalize_module(value):
+    name = str(value).strip().lower()
+    if name.endswith(".dll"):
+        name = os.path.splitext(name)[0]
+    if name.startswith("lib") and name.endswith(".so"):
+        name = name[3:-3]
+    return name
+
+
 def normalize_list(value):
     if value is None:
         return []
@@ -76,6 +87,8 @@ def find_config_path():
         os.path.join(OUTPUT_DIR, "offset_targets.json"),
         os.path.join(SCRIPT_DIR, MODULE_NAME + "_offset_targets.json"),
         os.path.join(SCRIPT_DIR, "offset_targets.json"),
+        os.path.join(REPO_ROOT, "tools", "targets", MODULE_NAME + "_offset_targets.json"),
+        os.path.join(REPO_ROOT, "tools", "targets", "offset_targets.json"),
     )
     for path in candidates:
         if os.path.isfile(path):
@@ -127,6 +140,13 @@ def normalize_targets(data):
         ).lower()
         targets.append(normalized)
     return targets
+
+
+def target_module_matches(target):
+    module = clean_name(target.get("module", ""))
+    if not module:
+        return True
+    return normalize_module(module) == normalize_module(MODULE_NAME)
 
 
 def infer_target_type(target):
@@ -629,7 +649,7 @@ def run():
         log("Expected one of: {}_offset_targets.json or offset_targets.json".format(MODULE_NAME))
         return None
 
-    targets = normalize_targets(load_json(config_path))
+    targets = [target for target in normalize_targets(load_json(config_path)) if target_module_matches(target)]
     log("module: {}".format(MODULE_NAME))
     log("base: {}".format(hex(IMAGE_BASE)))
     log("config: {}".format(config_path))

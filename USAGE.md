@@ -10,6 +10,7 @@ The executable opens `cs2.exe` with `PROCESS_QUERY_INFORMATION | PROCESS_VM_READ
 |------|----------|---------|
 | Runtime scanner | `cs2sign\` | Scans a running `cs2.exe` for byte signatures |
 | IDA plugin | `tools\ida\cs2_sig_dumper.py` | Generates fresh `*_signatures.json` files from DLLs opened in IDA |
+| Rust helper | `tools\sigindex-checker` | Verifies `signatures\index.json` against local signature files |
 | Read-only dumpers | `cs2sign.exe --dump-*` | Dumps schemas, interfaces, known offsets, and run info externally |
 | SDK generator | `cs2sign.exe --emit-sdk` | Generates C++, C#, Rust, Zig, and IDA output from schema JSON |
 
@@ -69,6 +70,12 @@ To refresh the GitHub signature pack after generating new IDA JSON files, run:
 
 ```powershell
 .\scripts\update-signatures.ps1
+```
+
+Optional cross-platform manifest check:
+
+```powershell
+cargo run --manifest-path .\tools\sigindex-checker\Cargo.toml -- .\signatures
 ```
 
 ## Scan Local IDA Signatures

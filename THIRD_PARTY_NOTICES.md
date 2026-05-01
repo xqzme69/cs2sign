@@ -11,3 +11,13 @@ License: MIT
 Copyright 2024 Emir
 
 The original repository acknowledges the creators of the Bad Apple video and song.
+
+## Rust crates used by tools/sigindex-checker
+
+The optional Rust signature index checker uses these direct crates:
+
+- `serde`
+- `serde_json`
+- `sha2`
+
+Licenses: MIT OR Apache-2.0

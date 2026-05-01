@@ -215,6 +215,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="bad_apple_frames.bap" />
+    <None Include="..\tools\targets\known_offsets.json" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -8,6 +8,8 @@ Counter-Strike 2 signature and dump tooling:
 2. **C++ Runtime Scanner** (`cs2sign.exe`) — scans live CS2 process memory to find those signatures
 3. **Read-Only Dumpers** (`cs2sign.exe --dump-*`) — dumps Source 2 schemas, interface registries, curated offsets, and run metadata through `ReadProcessMemory`
 4. **SDK Generator** (`cs2sign.exe --emit-sdk`) — generates C++, C#, Rust, Zig, and IDA output from `dump/schemas/*.json`
+5. **Rust Signature Index Checker** (`tools/sigindex-checker`) — validates the published signature manifest against local files
+6. **Target Registry** (`tools/targets/`) — tracks important published signatures and curated known offset patterns for CI validation
 
 ```
 IDA Pro + DLL files
@@ -157,7 +159,11 @@ When read-only offset dumping runs after a signature scan, curated offsets stay 
 | `SdkGenerator.h / SdkGenerator.cpp` | Generates C++, C#, Rust, Zig, and IDA SDK output from schema JSON |
 | `BadAppleResources.rc` / `bad_apple_frames.bap` | Windows resource entry and compressed Bad Apple frame pack |
 | `signatures/` | Published GitHub signature pack and `index.json` manifest |
+| `docs/asm/` | Resolver assembly snippets for RIP-relative and field displacement patterns |
 | `tools/ida/cs2_sig_dumper.py` | IDA plugin that generates fresh signatures |
+| `tools/targets/cs2_targets.json` | Maintainer target registry checked by CI |
+| `tools/targets/known_offsets.json` | Curated known offset pattern config embedded into the executable |
+| `tools/sigindex-checker/` | Rust CLI that verifies local signature hashes and sizes against `index.json` |
 
 ---
 
@@ -203,7 +209,7 @@ Schema metadata includes known entries such as:
 **How known offsets work:**
 
 1. Reads selected modules into local buffers
-2. Scans curated IDA-style patterns
+2. Scans curated IDA-style patterns loaded from embedded `known_offsets.json`
 3. Resolves RIP-relative captures or immediate offset operands
 4. Writes JSON/HPP and uses `dwBuildNumber` for `dump_info.json` when found
 
@@ -648,6 +654,8 @@ cs2sign/
     update-signatures.ps1  # Rebuild signatures/index.json for GitHub mode
     verify-signatures.ps1  # Validate published signature hashes and line endings
     verify-sdk.ps1         # Generate and syntax-check SDK output from fixtures
+  docs/
+    asm/                   # Resolver assembly snippets
   signatures/
     index.json             # Remote signature manifest
     *_signatures.json      # Published signature files used by GitHub mode
@@ -666,6 +674,7 @@ cs2sign/
 tools/
   ida/
     cs2_sig_dumper.py      # Recommended location for the IDA Pro plugin
+  sigindex-checker/        # Rust signature manifest checker
 ```
 
 ---

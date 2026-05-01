@@ -1,0 +1,625 @@
+{
+  "schema_version": 1,
+  "project": "cs2sign",
+  "description": "Maintainer target registry for published signatures and curated offsets.",
+  "targets": [
+    {
+      "name": "Handler",
+      "module": "client",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "BinaryProperties_GetValue",
+      "module": "client",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "ExtractModuleMetadata",
+      "module": "client",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "CreateInterface",
+      "module": "client",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "GetResourceManifests",
+      "module": "client",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "InstallSchemaBindings",
+      "module": "client",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "DllEntryPoint",
+      "module": "client",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "StartAddress",
+      "module": "engine2",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "Source2Main",
+      "module": "engine2",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "BinaryProperties_GetValue",
+      "module": "engine2",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "ExtractModuleMetadata",
+      "module": "engine2",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "CreateInterface",
+      "module": "engine2",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "GetResourceManifests",
+      "module": "engine2",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "InstallSchemaBindings",
+      "module": "engine2",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "DllEntryPoint",
+      "module": "engine2",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "BinaryProperties_GetValue",
+      "module": "inputsystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "ExtractModuleMetadata",
+      "module": "inputsystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "CreateInterface",
+      "module": "inputsystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "GetResourceManifests",
+      "module": "inputsystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "InstallSchemaBindings",
+      "module": "inputsystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "DllEntryPoint",
+      "module": "inputsystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "BinaryProperties_GetValue",
+      "module": "schemasystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "ExtractModuleMetadata",
+      "module": "schemasystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "CreateInterface",
+      "module": "schemasystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "GetResourceManifests",
+      "module": "schemasystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "InstallSchemaBindings",
+      "module": "schemasystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "DllEntryPoint",
+      "module": "schemasystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "TlsCallback_0",
+      "module": "schemasystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "BinaryProperties_GetValue",
+      "module": "soundsystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "ExtractModuleMetadata",
+      "module": "soundsystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "CreateInterface",
+      "module": "soundsystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "GetResourceManifests",
+      "module": "soundsystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "InstallSchemaBindings",
+      "module": "soundsystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "DllEntryPoint",
+      "module": "soundsystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "TlsCallback_0",
+      "module": "soundsystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "TlsCallback_1",
+      "module": "soundsystem",
+      "kind": "signature",
+      "required": true,
+      "stability": "good",
+      "source": "ida_plugin"
+    },
+    {
+      "name": "dwCSGOInput",
+      "module": "client",
+      "binary": "client.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwEntityList",
+      "module": "client",
+      "binary": "client.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwGameEntitySystem",
+      "module": "client",
+      "binary": "client.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwGameEntitySystem_highestEntityIndex",
+      "module": "client",
+      "binary": "client.dll",
+      "kind": "known_offset",
+      "result_type": "field_offset",
+      "resolver": "instruction_displacement",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwGameRules",
+      "module": "client",
+      "binary": "client.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwGlobalVars",
+      "module": "client",
+      "binary": "client.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwGlowManager",
+      "module": "client",
+      "binary": "client.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwLocalPlayerController",
+      "module": "client",
+      "binary": "client.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwPlantedC4",
+      "module": "client",
+      "binary": "client.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwPrediction",
+      "module": "client",
+      "binary": "client.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwSensitivity",
+      "module": "client",
+      "binary": "client.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwSensitivity_sensitivity",
+      "module": "client",
+      "binary": "client.dll",
+      "kind": "known_offset",
+      "result_type": "field_offset",
+      "resolver": "instruction_displacement",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwViewMatrix",
+      "module": "client",
+      "binary": "client.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwViewRender",
+      "module": "client",
+      "binary": "client.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwWeaponC4",
+      "module": "client",
+      "binary": "client.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwBuildNumber",
+      "module": "engine2",
+      "binary": "engine2.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwNetworkGameClient",
+      "module": "engine2",
+      "binary": "engine2.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwNetworkGameClient_clientTickCount",
+      "module": "engine2",
+      "binary": "engine2.dll",
+      "kind": "known_offset",
+      "result_type": "field_offset",
+      "resolver": "instruction_displacement",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwNetworkGameClient_deltaTick",
+      "module": "engine2",
+      "binary": "engine2.dll",
+      "kind": "known_offset",
+      "result_type": "field_offset",
+      "resolver": "instruction_displacement",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwNetworkGameClient_isBackgroundMap",
+      "module": "engine2",
+      "binary": "engine2.dll",
+      "kind": "known_offset",
+      "result_type": "field_offset",
+      "resolver": "instruction_displacement",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwNetworkGameClient_localPlayer",
+      "module": "engine2",
+      "binary": "engine2.dll",
+      "kind": "known_offset",
+      "result_type": "field_offset",
+      "resolver": "instruction_displacement",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwNetworkGameClient_maxClients",
+      "module": "engine2",
+      "binary": "engine2.dll",
+      "kind": "known_offset",
+      "result_type": "field_offset",
+      "resolver": "instruction_displacement",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwNetworkGameClient_serverTickCount",
+      "module": "engine2",
+      "binary": "engine2.dll",
+      "kind": "known_offset",
+      "result_type": "field_offset",
+      "resolver": "instruction_displacement",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwNetworkGameClient_signOnState",
+      "module": "engine2",
+      "binary": "engine2.dll",
+      "kind": "known_offset",
+      "result_type": "field_offset",
+      "resolver": "instruction_displacement",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwWindowHeight",
+      "module": "engine2",
+      "binary": "engine2.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwWindowWidth",
+      "module": "engine2",
+      "binary": "engine2.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwInputSystem",
+      "module": "inputsystem",
+      "binary": "inputsystem.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwGameTypes",
+      "module": "matchmaking",
+      "binary": "matchmaking.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwSoundSystem",
+      "module": "soundsystem",
+      "binary": "soundsystem.dll",
+      "kind": "known_offset",
+      "result_type": "module_rva",
+      "resolver": "rip_relative",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    },
+    {
+      "name": "dwSoundSystem_engineViewData",
+      "module": "soundsystem",
+      "binary": "soundsystem.dll",
+      "kind": "known_offset",
+      "result_type": "field_offset",
+      "resolver": "instruction_displacement",
+      "required": true,
+      "stability": "stable",
+      "source": "runtime_pattern"
+    }
+  ]
+}

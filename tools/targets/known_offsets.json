@@ -1,0 +1,364 @@
+{
+  "schema_version": 1,
+  "project": "cs2sign",
+  "patterns": [
+    {
+      "name": "dwCSGOInput",
+      "module": "client.dll",
+      "pattern": "48 89 05 ? ? ? ? 0F 57 C0 0F 11 05",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 3,
+        "instruction_length": 7
+      }
+    },
+    {
+      "name": "dwEntityList",
+      "module": "client.dll",
+      "pattern": "48 89 0D ? ? ? ? E9 ? ? ? ? CC",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 3,
+        "instruction_length": 7
+      }
+    },
+    {
+      "name": "dwGameEntitySystem",
+      "module": "client.dll",
+      "pattern": "48 8B 1D ? ? ? ? 48 89 1D ? ? ? ? 4C 63 B3",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 3,
+        "instruction_length": 7
+      }
+    },
+    {
+      "name": "dwGameEntitySystem_highestEntityIndex",
+      "module": "client.dll",
+      "pattern": "FF 81 ? ? ? ? 48 85 D2",
+      "result_type": "field_offset",
+      "capture": {
+        "mode": "u32_immediate",
+        "offset": 2
+      }
+    },
+    {
+      "name": "dwGameRules",
+      "module": "client.dll",
+      "pattern": "F6 C1 01 0F 85 ? ? ? ? 4C 8B 05 ? ? ? ? 4D 85",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 12,
+        "instruction_length": 16
+      }
+    },
+    {
+      "name": "dwGlobalVars",
+      "module": "client.dll",
+      "pattern": "48 89 15 ? ? ? ? 48 89 42",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 3,
+        "instruction_length": 7
+      }
+    },
+    {
+      "name": "dwGlowManager",
+      "module": "client.dll",
+      "pattern": "48 8B 05 ? ? ? ? C3 CC CC CC CC CC CC CC CC 8B 41",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 3,
+        "instruction_length": 7
+      }
+    },
+    {
+      "name": "dwLocalPlayerController",
+      "module": "client.dll",
+      "pattern": "48 8B 05 ? ? ? ? 41 89 BE",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 3,
+        "instruction_length": 7
+      }
+    },
+    {
+      "name": "dwPlantedC4",
+      "module": "client.dll",
+      "pattern": "48 8B 15 ? ? ? ? 41 FF C0 48 8D 4C 24 ? 44 89 05 ? ? ? ?",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 3,
+        "instruction_length": 7
+      }
+    },
+    {
+      "name": "dwPrediction",
+      "module": "client.dll",
+      "pattern": "48 8D 05 ? ? ? ? C3 CC CC CC CC CC CC CC CC 40 53 56 41 54",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 3,
+        "instruction_length": 7
+      }
+    },
+    {
+      "name": "dwSensitivity",
+      "module": "client.dll",
+      "pattern": "48 8D 0D ? ? ? ? ? ? ? ? ? ? ? ? 66 0F 6E CD",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 3,
+        "instruction_length": 7
+      }
+    },
+    {
+      "name": "dwSensitivity_sensitivity",
+      "module": "client.dll",
+      "pattern": "48 8D 7E ? 48 0F BA E0 ? 72 ? 85 D2 49 0F 4F FF",
+      "result_type": "field_offset",
+      "capture": {
+        "mode": "u8_immediate",
+        "offset": 3
+      }
+    },
+    {
+      "name": "dwViewMatrix",
+      "module": "client.dll",
+      "pattern": "48 8D 0D ? ? ? ? 48 C1 E0 06",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 3,
+        "instruction_length": 7
+      }
+    },
+    {
+      "name": "dwViewRender",
+      "module": "client.dll",
+      "pattern": "48 89 05 ? ? ? ? 48 8B C8 48 85 C0",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 3,
+        "instruction_length": 7
+      }
+    },
+    {
+      "name": "dwWeaponC4",
+      "module": "client.dll",
+      "pattern": "48 8B 15 ? ? ? ? 48 8B 5C 24 ? FF C0 89 05 ? ? ? ? 48 8B C6 48 89 34 EA 80 BE",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 3,
+        "instruction_length": 7
+      }
+    },
+    {
+      "name": "dwBuildNumber",
+      "module": "engine2.dll",
+      "pattern": "89 05 ? ? ? ? 48 8D 0D ? ? ? ? FF 15 ? ? ? ? 48 8B 0D",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 2,
+        "instruction_length": 6
+      }
+    },
+    {
+      "name": "dwNetworkGameClient",
+      "module": "engine2.dll",
+      "pattern": "48 89 3D ? ? ? ? FF 87",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 3,
+        "instruction_length": 7
+      }
+    },
+    {
+      "name": "dwNetworkGameClient_clientTickCount",
+      "module": "engine2.dll",
+      "pattern": "8B 81 ? ? ? ? C3 CC CC CC CC CC CC CC CC 8B 81 ? ? ? ? C3 CC CC CC CC CC CC CC CC 83 B9",
+      "result_type": "field_offset",
+      "capture": {
+        "mode": "u32_immediate",
+        "offset": 2
+      }
+    },
+    {
+      "name": "dwNetworkGameClient_deltaTick",
+      "module": "engine2.dll",
+      "pattern": "4C 8D B7 ? ? ? ? 4C 89 7C 24",
+      "result_type": "field_offset",
+      "capture": {
+        "mode": "u32_immediate",
+        "offset": 3
+      }
+    },
+    {
+      "name": "dwNetworkGameClient_isBackgroundMap",
+      "module": "engine2.dll",
+      "pattern": "0F B6 81 ? ? ? ? C3 CC CC CC CC CC CC CC CC 0F B6 81 ? ? ? ? C3 CC CC CC CC CC CC CC CC 40 53",
+      "result_type": "field_offset",
+      "capture": {
+        "mode": "u32_immediate",
+        "offset": 3
+      }
+    },
+    {
+      "name": "dwNetworkGameClient_localPlayer",
+      "module": "engine2.dll",
+      "pattern": "42 8B 94 D3 ? ? ? ? 5B 49 FF E3 32 C0 5B C3 CC CC CC CC CC CC CC CC 40 53",
+      "result_type": "field_offset",
+      "capture": {
+        "mode": "u32_immediate",
+        "offset": 4
+      }
+    },
+    {
+      "name": "dwNetworkGameClient_maxClients",
+      "module": "engine2.dll",
+      "pattern": "8B 81 ? ? ? ? C3 ? ? ? ? ? ? ? ? ? 8B 81 ? ? ? ? C3 ? ? ? ? ? ? ? ? ? 8B 81",
+      "result_type": "field_offset",
+      "capture": {
+        "mode": "u32_immediate",
+        "offset": 2
+      }
+    },
+    {
+      "name": "dwNetworkGameClient_serverTickCount",
+      "module": "engine2.dll",
+      "pattern": "8B 81 ? ? ? ? C3 CC CC CC CC CC CC CC CC 83 B9",
+      "result_type": "field_offset",
+      "capture": {
+        "mode": "u32_immediate",
+        "offset": 2
+      }
+    },
+    {
+      "name": "dwNetworkGameClient_signOnState",
+      "module": "engine2.dll",
+      "pattern": "44 8B 81 ? ? ? ? 48 8D 0D",
+      "result_type": "field_offset",
+      "capture": {
+        "mode": "u32_immediate",
+        "offset": 3
+      }
+    },
+    {
+      "name": "dwWindowHeight",
+      "module": "engine2.dll",
+      "pattern": "8B 05 ? ? ? ? 89 03",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 2,
+        "instruction_length": 6
+      }
+    },
+    {
+      "name": "dwWindowWidth",
+      "module": "engine2.dll",
+      "pattern": "8B 05 ? ? ? ? 89 07",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 2,
+        "instruction_length": 6
+      }
+    },
+    {
+      "name": "dwInputSystem",
+      "module": "inputsystem.dll",
+      "pattern": "48 89 05 ? ? ? ? 33 C0",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 3,
+        "instruction_length": 7
+      }
+    },
+    {
+      "name": "dwGameTypes",
+      "module": "matchmaking.dll",
+      "pattern": "48 8D 0D ? ? ? ? FF 90",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 3,
+        "instruction_length": 7
+      }
+    },
+    {
+      "name": "dwSoundSystem",
+      "module": "soundsystem.dll",
+      "pattern": "48 8D 05 ? ? ? ? C3 CC CC CC CC CC CC CC CC 48 89 15",
+      "result_type": "module_rva",
+      "capture": {
+        "mode": "rip_relative",
+        "offset": 3,
+        "instruction_length": 7
+      }
+    },
+    {
+      "name": "dwSoundSystem_engineViewData",
+      "module": "soundsystem.dll",
+      "pattern": "0F 11 47 ? 0F 10 4E ? 0F 11 8F",
+      "result_type": "field_offset",
+      "capture": {
+        "mode": "u8_immediate",
+        "offset": 3
+      }
+    }
+  ],
+  "build_overrides": [
+    {
+      "build": 14156,
+      "module": "client.dll",
+      "name": "dwGameRules",
+      "rva": "0x2328E38"
+    },
+    {
+      "build": 14156,
+      "module": "client.dll",
+      "name": "dwSensitivity",
+      "rva": "0x2326748"
+    },
+    {
+      "build": 14156,
+      "module": "engine2.dll",
+      "name": "dwNetworkGameClient_clientTickCount",
+      "rva": "0x378"
+    },
+    {
+      "build": 14156,
+      "module": "engine2.dll",
+      "name": "dwNetworkGameClient_isBackgroundMap",
+      "rva": "0x2C141F"
+    },
+    {
+      "build": 14156,
+      "module": "engine2.dll",
+      "name": "dwNetworkGameClient_localPlayer",
+      "rva": "0xF8"
+    },
+    {
+      "build": 14156,
+      "module": "engine2.dll",
+      "name": "dwNetworkGameClient_serverTickCount",
+      "rva": "0x24C"
+    }
+  ]
+}

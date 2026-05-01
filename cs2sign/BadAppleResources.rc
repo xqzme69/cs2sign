@@ -1,1 +1,2 @@
 BAD_APPLE_FRAMES RCDATA "bad_apple_frames.bap"
+KNOWN_OFFSETS_JSON RCDATA "..\\tools\\targets\\known_offsets.json"

@@ -9,9 +9,11 @@
 [Dd]ebug/
 [Rr]elease/
 [Pp]roduction/
+target/
 x64/
 Win32/
 compiled/
+**/target/
 **/x64/
 **/Win32/
 

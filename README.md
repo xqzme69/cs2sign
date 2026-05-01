@@ -18,6 +18,10 @@ The repo contains the C++ scanner, the IDA signature plugin at `tools/ida/cs2_si
 - Uses `ReadProcessMemory` for target memory access.
 - Can dump Source 2 schemas, interface registries, curated known offsets, and `dump_info.json` in read-only mode.
 - Generates C++, C#, Rust, Zig, and IDA SDK output from schema dumps.
+- Includes resolver assembly notes in `docs/asm/`.
+- Tracks important maintainer targets in `tools/targets/cs2_targets.json`.
+- Embeds curated known offset patterns from `tools/targets/known_offsets.json` into the executable.
+- Includes a small Rust signature index checker in `tools/sigindex-checker/`.
 - CI verifies the signature manifest, Windows build, SDK generation, and generated C#/Rust/Zig syntax.
 - Writes schema metadata such as `MNetworkVarNames` and `MNetworkChangeCallback` when available.
 
@@ -201,7 +205,11 @@ Those files are generated output and are ignored by git.
 - Generated build artifacts such as `x64/`, `Win32/`, `compiled/`, `.exe`, `.pdb`, `.obj`, and `.tlog` files are ignored by git.
 - The IDA plugin lives in `tools/ida/`.
 - GitHub mode uses `signatures/index.json` and the matching `signatures/*_signatures.json` files.
+- `tools/targets/cs2_targets.json` lists important signatures and curated known offsets that must not disappear silently.
+- `tools/targets/known_offsets.json` is the source file for curated known offset scan patterns; it is embedded as a Windows resource at build time.
 - `scripts\compare-signatures.ps1` compares a candidate signature pack against the current published pack and fails on suspicious drops.
+- `scripts\verify-targets.ps1` validates the maintainer target registry against the published signature pack.
+- `tools\sigindex-checker` is an optional Rust helper for local signature index/hash checks.
 - License and third-party notices are tracked in [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Limitations

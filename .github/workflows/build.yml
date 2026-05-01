@@ -15,6 +15,14 @@ jobs:
         shell: pwsh
         run: .\scripts\verify-signatures.ps1
 
+      - name: Verify target registry
+        shell: pwsh
+        run: .\scripts\verify-targets.ps1
+
+      - name: Verify signature index with Rust checker
+        shell: pwsh
+        run: cargo run --locked --manifest-path .\tools\sigindex-checker\Cargo.toml -- .\signatures
+
       - name: Build
         shell: pwsh
         run: .\scripts\build.ps1 -Configuration Release -Platform x64 -Target scanner -PlatformToolset v143

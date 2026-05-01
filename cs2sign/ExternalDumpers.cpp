@@ -1017,6 +1017,8 @@ struct KnownOffsetPattern {
     CaptureMode captureMode;
     size_t captureOffset;
     size_t instructionLength;
+    std::string resultType;
+    std::string source = "known_offsets.json";
 };
 
 struct BuildKnownOffset {
@@ -1025,6 +1027,293 @@ struct BuildKnownOffset {
     std::string name;
     std::uint32_t rva;
 };
+
+struct KnownOffsetConfig {
+    std::vector<KnownOffsetPattern> patterns;
+    std::vector<BuildKnownOffset> buildOverrides;
+    std::string error;
+};
+
+constexpr wchar_t kKnownOffsetsResourceName[] = L"KNOWN_OFFSETS_JSON";
+
+std::string ResultTypeForCaptureMode(CaptureMode captureMode);
+bool JsonStringField(const JsonValue& object, const std::string& key, std::string& value);
+bool ParseIntegerText(const std::string& value, std::uint64_t& result);
+
+std::string EnsureDllModuleName(std::string module) {
+    if (module.empty()) {
+        return module;
+    }
+
+    const std::string lowerModule = ToLowerAscii(module);
+    if (!EndsWith(lowerModule, ".dll")) {
+        module += ".dll";
+    }
+    return module;
+}
+
+std::optional<std::string> ReadTextFile(const std::filesystem::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        return std::nullopt;
+    }
+
+    std::stringstream stream;
+    stream << file.rdbuf();
+    return stream.str();
+}
+
+std::filesystem::path ExecutableDirectory() {
+    std::wstring buffer(MAX_PATH, L'\0');
+    DWORD size = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+    while (size == buffer.size()) {
+        buffer.resize(buffer.size() * 2);
+        size = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+    }
+
+    if (size == 0) {
+        return {};
+    }
+
+    buffer.resize(size);
+    return std::filesystem::path(buffer).parent_path();
+}
+
+std::optional<std::string> ReadEmbeddedTextResource(const wchar_t* resourceName) {
+    HRSRC resource = FindResourceW(nullptr, resourceName, RT_RCDATA);
+    if (!resource) {
+        return std::nullopt;
+    }
+
+    HGLOBAL loadedResource = LoadResource(nullptr, resource);
+    if (!loadedResource) {
+        return std::nullopt;
+    }
+
+    const auto* data = static_cast<const char*>(LockResource(loadedResource));
+    const DWORD dataSize = SizeofResource(nullptr, resource);
+    if (!data || dataSize == 0) {
+        return std::nullopt;
+    }
+
+    return std::string(data, data + dataSize);
+}
+
+std::string LoadKnownOffsetConfigText() {
+    const std::filesystem::path current = std::filesystem::current_path();
+    const std::filesystem::path exeDirectory = ExecutableDirectory();
+    const std::filesystem::path candidates[] = {
+        current / "known_offsets.json",
+        current / "tools" / "targets" / "known_offsets.json",
+        exeDirectory / "known_offsets.json"
+    };
+
+    for (const std::filesystem::path& candidate : candidates) {
+        if (candidate.empty()) {
+            continue;
+        }
+        if (std::optional<std::string> text = ReadTextFile(candidate)) {
+            return *text;
+        }
+    }
+
+    return ReadEmbeddedTextResource(kKnownOffsetsResourceName).value_or(std::string{});
+}
+
+const JsonValue* JsonObjectMember(const JsonValue& object, const std::string& key) {
+    if (object.type != JsonValue::Type::Object) {
+        return nullptr;
+    }
+
+    const auto fieldIt = object.objectValue.find(key);
+    return fieldIt == object.objectValue.end() ? nullptr : &fieldIt->second;
+}
+
+bool JsonUInt32Member(const JsonValue& object, const std::string& key, std::uint32_t& value) {
+    const JsonValue* member = JsonObjectMember(object, key);
+    if (!member) {
+        return false;
+    }
+
+    std::uint64_t parsed = 0;
+    if (member->type == JsonValue::Type::Number && member->numberIsInteger && member->numberValue >= 0) {
+        parsed = static_cast<std::uint64_t>(member->numberValue);
+    } else if (member->type == JsonValue::Type::String) {
+        if (!ParseIntegerText(member->stringValue, parsed)) {
+            return false;
+        }
+    } else {
+        return false;
+    }
+
+    if (parsed > (std::numeric_limits<std::uint32_t>::max)()) {
+        return false;
+    }
+
+    value = static_cast<std::uint32_t>(parsed);
+    return true;
+}
+
+std::optional<CaptureMode> CaptureModeFromString(const std::string& mode) {
+    const std::string normalized = ToLowerAscii(mode);
+    if (normalized == "rip_relative") {
+        return CaptureMode::RipRelative;
+    }
+    if (normalized == "u8_immediate") {
+        return CaptureMode::U8Immediate;
+    }
+    if (normalized == "u32_immediate") {
+        return CaptureMode::U32Immediate;
+    }
+    return std::nullopt;
+}
+
+std::optional<KnownOffsetPattern> ParseKnownOffsetPattern(const JsonValue& value, std::string& error) {
+    if (value.type != JsonValue::Type::Object) {
+        error = "known offset pattern must be an object";
+        return std::nullopt;
+    }
+
+    std::string name;
+    std::string module;
+    std::string pattern;
+    if (!JsonStringField(value, "name", name) || name.empty()) {
+        error = "known offset pattern has no name";
+        return std::nullopt;
+    }
+    if (!JsonStringField(value, "module", module) || module.empty()) {
+        error = "known offset pattern has no module: " + name;
+        return std::nullopt;
+    }
+    if (!JsonStringField(value, "pattern", pattern) || pattern.empty()) {
+        error = "known offset pattern has no pattern: " + name;
+        return std::nullopt;
+    }
+
+    const JsonValue* capture = JsonObjectMember(value, "capture");
+    if (!capture || capture->type != JsonValue::Type::Object) {
+        error = "known offset pattern has no capture object: " + name;
+        return std::nullopt;
+    }
+
+    std::string modeText;
+    if (!JsonStringField(*capture, "mode", modeText)) {
+        error = "known offset capture has no mode: " + name;
+        return std::nullopt;
+    }
+
+    const std::optional<CaptureMode> captureMode = CaptureModeFromString(modeText);
+    if (!captureMode) {
+        error = "unknown known offset capture mode for " + name + ": " + modeText;
+        return std::nullopt;
+    }
+
+    std::uint32_t captureOffset = 0;
+    if (!JsonUInt32Member(*capture, "offset", captureOffset)) {
+        error = "known offset capture has no offset: " + name;
+        return std::nullopt;
+    }
+
+    std::uint32_t instructionLength = 0;
+    JsonUInt32Member(*capture, "instruction_length", instructionLength);
+
+    KnownOffsetPattern descriptor;
+    descriptor.moduleName = Utf8ToWide(EnsureDllModuleName(module));
+    descriptor.name = name;
+    descriptor.pattern = pattern;
+    descriptor.captureMode = *captureMode;
+    descriptor.captureOffset = captureOffset;
+    descriptor.instructionLength = instructionLength;
+    JsonStringField(value, "result_type", descriptor.resultType);
+    if (descriptor.resultType.empty()) {
+        descriptor.resultType = ResultTypeForCaptureMode(descriptor.captureMode);
+    }
+    return descriptor;
+}
+
+std::optional<BuildKnownOffset> ParseBuildKnownOffset(const JsonValue& value, std::string& error) {
+    if (value.type != JsonValue::Type::Object) {
+        error = "build override must be an object";
+        return std::nullopt;
+    }
+
+    std::string module;
+    std::string name;
+    std::uint32_t build = 0;
+    std::uint32_t rva = 0;
+    if (!JsonUInt32Member(value, "build", build)) {
+        error = "build override has no build number";
+        return std::nullopt;
+    }
+    if (!JsonStringField(value, "module", module) || module.empty()) {
+        error = "build override has no module";
+        return std::nullopt;
+    }
+    if (!JsonStringField(value, "name", name) || name.empty()) {
+        error = "build override has no name";
+        return std::nullopt;
+    }
+    if (!JsonUInt32Member(value, "rva", rva)) {
+        error = "build override has no rva: " + name;
+        return std::nullopt;
+    }
+
+    return BuildKnownOffset{ build, EnsureDllModuleName(module), name, rva };
+}
+
+KnownOffsetConfig LoadKnownOffsetConfig() {
+    KnownOffsetConfig config;
+    const std::string jsonText = LoadKnownOffsetConfigText();
+    if (jsonText.empty()) {
+        config.error = "known_offsets.json was not found";
+        return config;
+    }
+
+    JsonValue root;
+    std::string error;
+    JsonReader reader(jsonText);
+    if (!reader.Parse(root, error) || root.type != JsonValue::Type::Object) {
+        config.error = "failed to parse known_offsets.json: " + error;
+        return config;
+    }
+
+    const JsonValue* patterns = JsonObjectMember(root, "patterns");
+    if (!patterns || patterns->type != JsonValue::Type::Array) {
+        config.error = "known_offsets.json has no patterns array";
+        return config;
+    }
+
+    for (const JsonValue& item : patterns->arrayValue) {
+        std::optional<KnownOffsetPattern> descriptor = ParseKnownOffsetPattern(item, error);
+        if (!descriptor) {
+            config.error = error;
+            return config;
+        }
+        config.patterns.push_back(std::move(*descriptor));
+    }
+
+    if (const JsonValue* overrides = JsonObjectMember(root, "build_overrides")) {
+        if (overrides->type != JsonValue::Type::Array) {
+            config.error = "known_offsets.json build_overrides must be an array";
+            return config;
+        }
+        for (const JsonValue& item : overrides->arrayValue) {
+            std::optional<BuildKnownOffset> knownOffset = ParseBuildKnownOffset(item, error);
+            if (!knownOffset) {
+                config.error = error;
+                return config;
+            }
+            config.buildOverrides.push_back(*knownOffset);
+        }
+    }
+
+    return config;
+}
+
+const KnownOffsetConfig& KnownOffsetConfigData() {
+    static const KnownOffsetConfig config = LoadKnownOffsetConfig();
+    return config;
+}
 
 std::optional<std::uint32_t> ResolveKnownOffset(
     const std::vector<std::uint8_t>& image,
@@ -1072,50 +1361,12 @@ std::string ResultTypeForCaptureMode(CaptureMode captureMode) {
     return "module_rva";
 }
 
-std::vector<KnownOffsetPattern> KnownOffsetPatterns() {
-    return {
-        { L"client.dll", "dwCSGOInput", "48 89 05 ? ? ? ? 0F 57 C0 0F 11 05", CaptureMode::RipRelative, 3, 7 },
-        { L"client.dll", "dwEntityList", "48 89 0D ? ? ? ? E9 ? ? ? ? CC", CaptureMode::RipRelative, 3, 7 },
-        { L"client.dll", "dwGameEntitySystem", "48 8B 1D ? ? ? ? 48 89 1D ? ? ? ? 4C 63 B3", CaptureMode::RipRelative, 3, 7 },
-        { L"client.dll", "dwGameEntitySystem_highestEntityIndex", "FF 81 ? ? ? ? 48 85 D2", CaptureMode::U32Immediate, 2, 0 },
-        { L"client.dll", "dwGameRules", "F6 C1 01 0F 85 ? ? ? ? 4C 8B 05 ? ? ? ? 4D 85", CaptureMode::RipRelative, 12, 16 },
-        { L"client.dll", "dwGlobalVars", "48 89 15 ? ? ? ? 48 89 42", CaptureMode::RipRelative, 3, 7 },
-        { L"client.dll", "dwGlowManager", "48 8B 05 ? ? ? ? C3 CC CC CC CC CC CC CC CC 8B 41", CaptureMode::RipRelative, 3, 7 },
-        { L"client.dll", "dwLocalPlayerController", "48 8B 05 ? ? ? ? 41 89 BE", CaptureMode::RipRelative, 3, 7 },
-        { L"client.dll", "dwPlantedC4", "48 8B 15 ? ? ? ? 41 FF C0 48 8D 4C 24 ? 44 89 05 ? ? ? ?", CaptureMode::RipRelative, 3, 7 },
-        { L"client.dll", "dwPrediction", "48 8D 05 ? ? ? ? C3 CC CC CC CC CC CC CC CC 40 53 56 41 54", CaptureMode::RipRelative, 3, 7 },
-        { L"client.dll", "dwSensitivity", "48 8D 0D ? ? ? ? ? ? ? ? ? ? ? ? 66 0F 6E CD", CaptureMode::RipRelative, 3, 7 },
-        { L"client.dll", "dwSensitivity_sensitivity", "48 8D 7E ? 48 0F BA E0 ? 72 ? 85 D2 49 0F 4F FF", CaptureMode::U8Immediate, 3, 0 },
-        { L"client.dll", "dwViewMatrix", "48 8D 0D ? ? ? ? 48 C1 E0 06", CaptureMode::RipRelative, 3, 7 },
-        { L"client.dll", "dwViewRender", "48 89 05 ? ? ? ? 48 8B C8 48 85 C0", CaptureMode::RipRelative, 3, 7 },
-        { L"client.dll", "dwWeaponC4", "48 8B 15 ? ? ? ? 48 8B 5C 24 ? FF C0 89 05 ? ? ? ? 48 8B C6 48 89 34 EA 80 BE", CaptureMode::RipRelative, 3, 7 },
-        { L"engine2.dll", "dwBuildNumber", "89 05 ? ? ? ? 48 8D 0D ? ? ? ? FF 15 ? ? ? ? 48 8B 0D", CaptureMode::RipRelative, 2, 6 },
-        { L"engine2.dll", "dwNetworkGameClient", "48 89 3D ? ? ? ? FF 87", CaptureMode::RipRelative, 3, 7 },
-        { L"engine2.dll", "dwNetworkGameClient_clientTickCount", "8B 81 ? ? ? ? C3 CC CC CC CC CC CC CC CC 8B 81 ? ? ? ? C3 CC CC CC CC CC CC CC CC 83 B9", CaptureMode::U32Immediate, 2, 0 },
-        { L"engine2.dll", "dwNetworkGameClient_deltaTick", "4C 8D B7 ? ? ? ? 4C 89 7C 24", CaptureMode::U32Immediate, 3, 0 },
-        { L"engine2.dll", "dwNetworkGameClient_isBackgroundMap", "0F B6 81 ? ? ? ? C3 CC CC CC CC CC CC CC CC 0F B6 81 ? ? ? ? C3 CC CC CC CC CC CC CC CC 40 53", CaptureMode::U32Immediate, 3, 0 },
-        { L"engine2.dll", "dwNetworkGameClient_localPlayer", "42 8B 94 D3 ? ? ? ? 5B 49 FF E3 32 C0 5B C3 CC CC CC CC CC CC CC CC 40 53", CaptureMode::U32Immediate, 4, 0 },
-        { L"engine2.dll", "dwNetworkGameClient_maxClients", "8B 81 ? ? ? ? C3 ? ? ? ? ? ? ? ? ? 8B 81 ? ? ? ? C3 ? ? ? ? ? ? ? ? ? 8B 81", CaptureMode::U32Immediate, 2, 0 },
-        { L"engine2.dll", "dwNetworkGameClient_serverTickCount", "8B 81 ? ? ? ? C3 CC CC CC CC CC CC CC CC 83 B9", CaptureMode::U32Immediate, 2, 0 },
-        { L"engine2.dll", "dwNetworkGameClient_signOnState", "44 8B 81 ? ? ? ? 48 8D 0D", CaptureMode::U32Immediate, 3, 0 },
-        { L"engine2.dll", "dwWindowHeight", "8B 05 ? ? ? ? 89 03", CaptureMode::RipRelative, 2, 6 },
-        { L"engine2.dll", "dwWindowWidth", "8B 05 ? ? ? ? 89 07", CaptureMode::RipRelative, 2, 6 },
-        { L"inputsystem.dll", "dwInputSystem", "48 89 05 ? ? ? ? 33 C0", CaptureMode::RipRelative, 3, 7 },
-        { L"matchmaking.dll", "dwGameTypes", "48 8D 0D ? ? ? ? FF 90", CaptureMode::RipRelative, 3, 7 },
-        { L"soundsystem.dll", "dwSoundSystem", "48 8D 05 ? ? ? ? C3 CC CC CC CC CC CC CC CC 48 89 15", CaptureMode::RipRelative, 3, 7 },
-        { L"soundsystem.dll", "dwSoundSystem_engineViewData", "0F 11 47 ? 0F 10 4E ? 0F 11 8F", CaptureMode::U8Immediate, 3, 0 },
-    };
+const std::vector<KnownOffsetPattern>& KnownOffsetPatterns() {
+    return KnownOffsetConfigData().patterns;
 }
 
-std::vector<BuildKnownOffset> BuildKnownOffsets() {
-    return {
-        { 14156, "client.dll", "dwGameRules", 0x2328E38 },
-        { 14156, "client.dll", "dwSensitivity", 0x2326748 },
-        { 14156, "engine2.dll", "dwNetworkGameClient_clientTickCount", 0x378 },
-        { 14156, "engine2.dll", "dwNetworkGameClient_isBackgroundMap", 0x2C141F },
-        { 14156, "engine2.dll", "dwNetworkGameClient_localPlayer", 0xF8 },
-        { 14156, "engine2.dll", "dwNetworkGameClient_serverTickCount", 0x24C },
-    };
+const std::vector<BuildKnownOffset>& BuildKnownOffsets() {
+    return KnownOffsetConfigData().buildOverrides;
 }
 
 void AddDerivedOffsets(
@@ -1181,13 +1432,20 @@ void ApplyBuildKnownOffsets(std::vector<KnownOffsetInfo>& offsets, std::uint32_t
         });
 
         if (offsetIt == offsets.end()) {
-            offsets.push_back({ knownOffset.module, knownOffset.name, true, knownOffset.rva, "" });
+            KnownOffsetInfo info;
+            info.module = knownOffset.module;
+            info.name = knownOffset.name;
+            info.found = true;
+            info.rva = knownOffset.rva;
+            info.source = "build_override";
+            offsets.push_back(std::move(info));
             continue;
         }
 
         offsetIt->found = true;
         offsetIt->rva = knownOffset.rva;
         offsetIt->error.clear();
+        offsetIt->source = "build_override";
     }
 }
 
@@ -1372,6 +1630,11 @@ std::vector<ResolvedSignatureInfo> ReadResolvedSignatures(ProcessMemoryReader& p
 }
 
 std::vector<KnownOffsetInfo> ReadKnownOffsets(ProcessMemoryReader& process) {
+    const KnownOffsetConfig& config = KnownOffsetConfigData();
+    if (!config.error.empty()) {
+        throw std::runtime_error(config.error);
+    }
+
     std::vector<KnownOffsetInfo> offsets;
     std::map<std::wstring, std::vector<std::uint8_t>> images;
 
@@ -1380,7 +1643,10 @@ std::vector<KnownOffsetInfo> ReadKnownOffsets(ProcessMemoryReader& process) {
         KnownOffsetInfo info;
         info.module = WideToUtf8(descriptor.moduleName);
         info.name = descriptor.name;
-        info.resultType = ResultTypeForCaptureMode(descriptor.captureMode);
+        info.source = descriptor.source;
+        info.resultType = descriptor.resultType.empty() ?
+            ResultTypeForCaptureMode(descriptor.captureMode) :
+            descriptor.resultType;
 
         if (!process.GetModuleInfo(descriptor.moduleName, module)) {
             info.error = "module not loaded";

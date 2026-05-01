@@ -93,5 +93,8 @@
     <None Include="bad_apple_frames.bap">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="..\tools\targets\known_offsets.json">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
