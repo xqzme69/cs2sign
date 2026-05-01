@@ -34,6 +34,10 @@ cs2_signatures.json
 dump/
 **/dump/
 
+# Local automation config
+scripts/auto-update-config.json
+scripts/stderr.txt
+
 # Archives and temporary files
 *.zip
 *.7z

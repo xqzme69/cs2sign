@@ -2,34 +2,34 @@
   "schema_version": 1,
   "project": "cs2sign",
   "source": "github",
-  "build": "cs2-current",
-  "generated_at": "2026-04-30T23:40:58Z",
+  "build": "14158",
+  "generated_at": "2026-05-01T20:47:09Z",
   "base_url": "https://api.github.com/repos/xqzme69/cs2sign/contents/signatures/",
   "files": [
     {
       "name": "client_signatures.json",
-      "sha256": "b1c6740d21f4302dfdaa7cf71e20c307323e7fde2e68640fa55193b44a6884de",
-      "size": 48767
+      "sha256": "7a68e9d8531cb0bc24d999aaa3d812d9e76f9fe9e11e6257a32997c0746d8566",
+      "size": 27581
     },
     {
       "name": "engine2_signatures.json",
-      "sha256": "c6a3098cdcd0d951bbb5cdf3d4a1d2c8013e2331fc5bd189131b77f8301d4487",
-      "size": 41339
+      "sha256": "64ca43c9ff2e90673a0d5b32ecaf486ee4f7cf55a0fc2722ed3969a68583d87e",
+      "size": 63459
     },
     {
       "name": "inputsystem_signatures.json",
-      "sha256": "c52d6a80e9908c985a6e0cd111cfe4e0ef7562faa36f1f6d1933439186ede1a5",
-      "size": 5514
+      "sha256": "7b4f5ca6b754686176e7c8596e6c0cd20b6c51cc422170519984ac2297ef590e",
+      "size": 7863
     },
     {
       "name": "schemasystem_signatures.json",
-      "sha256": "76a230db2a0fd5d7bdf2f88bc9ff1d8f33f9c2450da5c4ebf95eb5ba713fc854",
-      "size": 6853
+      "sha256": "8b6e39aa41bd445e373e4a9b4b437eb2a9b315b90978b2f22b102f071db58764",
+      "size": 9931
     },
     {
       "name": "soundsystem_signatures.json",
-      "sha256": "9b900afe49e1bbb18ca99f6809591c90f5f26d9930a8f3b0765628bb8ff553de",
-      "size": 29342
+      "sha256": "41a9c9f4ccaa0fc51ad76115ef64ac181f8b9e64e668643a9813d27d782496a4",
+      "size": 44498
     }
   ]
 }

@@ -1,0 +1,36 @@
+{
+  "ida_path": "C:\\Program Files\\IDA Professional 9.2",
+  "ida_executable": "idat.exe",
+  "ida_script": "",
+
+  "dll_source": "local_steam",
+  "steam_library": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive",
+  "steamcmd_path": "",
+  "steamcmd_login": "anonymous",
+  "steamcmd_app_id": 730,
+  "depot_path": "",
+
+  "repo_path": "",
+  "work_dir": "",
+
+  "update_wait_seconds": 1200,
+  "ida_timeout_seconds": 1800,
+  "download_attempts": 3,
+  "push_attempts": 3,
+  "max_consecutive_failures": 5,
+  "require_all_modules": true,
+  "create_github_release": false,
+  "cleanup_idb": true,
+  "log_retention_days": 30,
+  "ida_priority": "BelowNormal",
+
+  "discord_webhook": "",
+
+  "modules": [
+    { "name": "client",       "dll_rel": "game\\csgo\\bin\\win64\\client.dll" },
+    { "name": "engine2",      "dll_rel": "game\\bin\\win64\\engine2.dll" },
+    { "name": "schemasystem", "dll_rel": "game\\bin\\win64\\schemasystem.dll" },
+    { "name": "inputsystem",  "dll_rel": "game\\bin\\win64\\inputsystem.dll" },
+    { "name": "soundsystem",  "dll_rel": "game\\bin\\win64\\soundsystem.dll" }
+  ]
+}
