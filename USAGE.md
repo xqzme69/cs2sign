@@ -233,7 +233,7 @@ Required signatures affect update health. Optional signatures are still reported
 
 ### `dump\offsets.json`
 
-Written by `--dump-offsets`. Contains curated offsets such as `dwEntityList`, `dwGlobalVars`, `dwViewMatrix`, and `dwBuildNumber`.
+Written by `--dump-offsets`. Contains curated offsets such as `dwEntityList`, `dwGlobalVars`, `dwViewMatrix`, and `dwBuildNumber`. Each entry includes `result_type`, `validation`, and `validation_error`. Module RVA results use `rva`; field offset results use `offset`.
 
 ### `dump\resolved_signatures.json`
 

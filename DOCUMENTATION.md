@@ -126,7 +126,7 @@ For signatures generated from offset references, add a `resolver` object:
 
 `rip_relative` resolves `match + add + displacement`. `instruction_displacement` reads the operand displacement and reports that value, which is useful for field offsets. `direct_match` keeps the old match-address behavior. `result_type` can be `absolute_address`, `module_rva`, `field_offset`, or `function_address`.
 
-When read-only offset dumping runs after a signature scan, curated offsets stay in `dump\offsets.json` and resolved results from `cs2_signatures.json` are written to `dump\resolved_signatures.json`. Module addresses are converted to RVAs when the module is loaded; field displacements are emitted as field offsets.
+When read-only offset dumping runs after a signature scan, curated offsets stay in `dump\offsets.json` and resolved results from `cs2_signatures.json` are written to `dump\resolved_signatures.json`. Module addresses are converted to RVAs when the module is loaded; field displacements are emitted as field offsets. Curated offsets include validation status and a validation error when a result looks unsafe.
 
 `category`, `importance`, and `required` feed scanner health. `game` and `module` are required unless the JSON says otherwise. `library`, `runtime`, `thunk`, and `auto` are optional.
 

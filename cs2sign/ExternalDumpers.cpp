@@ -26,6 +26,7 @@ constexpr size_t kMaxSchemaEnumsTotal = 50000;
 constexpr size_t kMaxSchemaEnumValuesTotal = 500000;
 constexpr size_t kMaxInterfacesPerModule = 4096;
 constexpr std::int32_t kMaxClassSize = 0x400000;
+constexpr std::uint32_t kMaxReasonableFieldOffset = 0x1000000;
 
 struct RemoteUtlVector {
     std::int32_t count;
@@ -211,6 +212,8 @@ struct KnownOffsetInfo {
     std::string error;
     std::string source = "pattern";
     std::string resultType = "module_rva";
+    std::string validationStatus = "not_run";
+    std::string validationError;
 };
 
 struct ResolvedSignatureInfo {
@@ -1057,6 +1060,18 @@ std::optional<std::uint32_t> ResolveKnownOffset(
     return std::nullopt;
 }
 
+std::string ResultTypeForCaptureMode(CaptureMode captureMode) {
+    switch (captureMode) {
+        case CaptureMode::RipRelative:
+            return "module_rva";
+        case CaptureMode::U8Immediate:
+        case CaptureMode::U32Immediate:
+            return "field_offset";
+    }
+
+    return "module_rva";
+}
+
 std::vector<KnownOffsetPattern> KnownOffsetPatterns() {
     return {
         { L"client.dll", "dwCSGOInput", "48 89 05 ? ? ? ? 0F 57 C0 0F 11 05", CaptureMode::RipRelative, 3, 7 },
@@ -1365,6 +1380,7 @@ std::vector<KnownOffsetInfo> ReadKnownOffsets(ProcessMemoryReader& process) {
         KnownOffsetInfo info;
         info.module = WideToUtf8(descriptor.moduleName);
         info.name = descriptor.name;
+        info.resultType = ResultTypeForCaptureMode(descriptor.captureMode);
 
         if (!process.GetModuleInfo(descriptor.moduleName, module)) {
             info.error = "module not loaded";
@@ -1400,6 +1416,48 @@ std::vector<KnownOffsetInfo> ReadKnownOffsets(ProcessMemoryReader& process) {
     return offsets;
 }
 
+void ValidateKnownOffsets(ProcessMemoryReader& process, std::vector<KnownOffsetInfo>& offsets) {
+    for (KnownOffsetInfo& offset : offsets) {
+        if (!offset.found) {
+            offset.validationStatus = "skipped";
+            offset.validationError = offset.error.empty() ? "not found" : offset.error;
+            continue;
+        }
+
+        ProcessModule module{};
+        if (!process.GetModuleInfo(Utf8ToWide(offset.module), module)) {
+            offset.validationStatus = "failed";
+            offset.validationError = "module not loaded";
+            continue;
+        }
+
+        if (offset.resultType == "module_rva") {
+            if (offset.rva < module.size) {
+                offset.validationStatus = "ok";
+                offset.validationError.clear();
+            } else {
+                offset.validationStatus = "failed";
+                offset.validationError = "rva outside module";
+            }
+            continue;
+        }
+
+        if (offset.resultType == "field_offset") {
+            if (offset.rva <= kMaxReasonableFieldOffset) {
+                offset.validationStatus = "ok";
+                offset.validationError.clear();
+            } else {
+                offset.validationStatus = "failed";
+                offset.validationError = "field offset is too large";
+            }
+            continue;
+        }
+
+        offset.validationStatus = "skipped";
+        offset.validationError = "unsupported result type";
+    }
+}
+
 void WriteOffsetsJson(const std::filesystem::path& outputPath, const std::vector<KnownOffsetInfo>& offsets) {
     std::ofstream file(outputPath);
     file << "{\n";
@@ -1411,13 +1469,21 @@ void WriteOffsetsJson(const std::filesystem::path& outputPath, const std::vector
         file << "      \"name\": \"" << EscapeJson(offset.name) << "\",\n";
         file << "      \"source\": \"" << EscapeJson(offset.source) << "\",\n";
         file << "      \"result_type\": \"" << EscapeJson(offset.resultType) << "\",\n";
+        file << "      \"validation\": \"" << EscapeJson(offset.validationStatus) << "\",\n";
         file << "      \"found\": " << (offset.found ? "true" : "false") << ",\n";
         if (offset.found) {
-            file << "      \"rva\": \"" << FormatHex(offset.rva) << "\",\n";
-            file << "      \"error\": null\n";
+            const std::string valueName = offset.resultType == "field_offset" ? "offset" : "rva";
+            file << "      \"" << valueName << "\": \"" << FormatHex(offset.rva) << "\",\n";
+            file << "      \"error\": null,\n";
         } else {
-            file << "      \"rva\": null,\n";
-            file << "      \"error\": \"" << EscapeJson(offset.error) << "\"\n";
+            const std::string valueName = offset.resultType == "field_offset" ? "offset" : "rva";
+            file << "      \"" << valueName << "\": null,\n";
+            file << "      \"error\": \"" << EscapeJson(offset.error) << "\",\n";
+        }
+        if (offset.validationError.empty()) {
+            file << "      \"validation_error\": null\n";
+        } else {
+            file << "      \"validation_error\": \"" << EscapeJson(offset.validationError) << "\"\n";
         }
         file << "    }" << (index + 1 == offsets.size() ? "" : ",") << "\n";
     }
@@ -1464,9 +1530,12 @@ void WriteOffsetsHpp(const std::filesystem::path& outputPath, const std::vector<
             file << "namespace " << currentModule << " {\n";
         }
 
-        if (offset.found) {
+        if (offset.found && offset.validationStatus != "failed") {
             file << "    static constexpr std::uintptr_t " << offset.name
                  << " = " << FormatHex(offset.rva) << ";\n";
+        } else if (offset.found) {
+            file << "    // " << offset.name << " failed validation: "
+                 << offset.validationError << "\n";
         } else {
             file << "    // " << offset.name << " failed: " << offset.error << "\n";
         }
@@ -1506,6 +1575,8 @@ OffsetDumpResult DumpKnownOffsets(
             }
         }
     }
+
+    ValidateKnownOffsets(process, offsets);
 
     WriteOffsetsJson(outputDirectory / "offsets.json", offsets);
     WriteOffsetsHpp(outputDirectory / "offsets.hpp", offsets);
