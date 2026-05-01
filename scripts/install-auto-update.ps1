@@ -36,9 +36,36 @@ if (-not (Test-Path $configPath)) {
     exit 1
 }
 
+$config = Get-Content $configPath -Raw | ConvertFrom-Json
+$workDir = if ($config.work_dir) { $config.work_dir } else { Join-Path $env:LOCALAPPDATA "cs2sign-auto" }
+if (-not (Test-Path $workDir)) {
+    New-Item -ItemType Directory -Force -Path $workDir | Out-Null
+}
+
+$pwshPath = (Get-Command pwsh.exe -ErrorAction SilentlyContinue).Source
+if (-not $pwshPath) {
+    $pwshPath = (Get-Command powershell.exe -ErrorAction SilentlyContinue).Source
+}
+if (-not $pwshPath) {
+    Write-Error "PowerShell executable not found."
+    exit 1
+}
+
+$wrapperPath = Join-Path $workDir "run-auto-update-hidden.vbs"
+$escapedScriptDir = $ScriptDir.Replace('"', '""')
+$escapedScriptPath = $ScriptPath.Replace('"', '""')
+$escapedPwshPath = $pwshPath.Replace('"', '""')
+$wrapper = @"
+Set shell = CreateObject("WScript.Shell")
+shell.CurrentDirectory = "$escapedScriptDir"
+command = """$escapedPwshPath"" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""$escapedScriptPath"""
+WScript.Quit shell.Run(command, 0, True)
+"@
+Set-Content -Path $wrapperPath -Value $wrapper -Encoding ASCII
+
 $action = New-ScheduledTaskAction `
-    -Execute "pwsh.exe" `
-    -Argument "-WindowStyle Hidden -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$ScriptPath`"" `
+    -Execute "wscript.exe" `
+    -Argument "`"$wrapperPath`"" `
     -WorkingDirectory $ScriptDir
 
 $triggerInterval = New-ScheduledTaskTrigger `
@@ -75,6 +102,7 @@ Write-Host "Scheduled task '$TaskName' registered."
 Write-Host "  Interval: every $IntervalMinutes minutes"
 Write-Host "  Script:   $ScriptPath"
 Write-Host "  Config:   $configPath"
+Write-Host "  Wrapper:  $wrapperPath"
 Write-Host ""
 Write-Host "To test manually:"
 Write-Host "  pwsh -File `"$ScriptPath`" -Force -DryRun"
