@@ -99,6 +99,9 @@ std::int64_t GetNumberMember(const JsonValue& value, std::string_view name, std:
     if (!member || member->type != JsonValue::Type::Number) {
         return fallback;
     }
+    if (!member->numberIsInteger) {
+        return fallback;
+    }
 
     return member->numberValue;
 }

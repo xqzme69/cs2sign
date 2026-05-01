@@ -19,6 +19,8 @@ struct JsonValue {
     Type type = Type::Null;
     bool boolValue = false;
     std::int64_t numberValue = 0;
+    double numberFloatValue = 0.0;
+    bool numberIsInteger = true;
     std::string stringValue;
     std::vector<JsonValue> arrayValue;
     std::map<std::string, JsonValue> objectValue;
@@ -40,7 +42,7 @@ private:
     bool MatchLiteral(std::string_view literal);
     bool ParseValue(JsonValue& value);
     bool ParseString(std::string& value);
-    bool ParseNumber(std::int64_t& value);
+    bool ParseNumber(JsonValue& value);
     bool ParseArray(JsonValue& value);
     bool ParseObject(JsonValue& value);
 };

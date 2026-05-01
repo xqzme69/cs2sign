@@ -33,6 +33,7 @@ IDA Pro + DLL files
        +--> dump/schemas/*.json + *.hpp
        +--> dump/interfaces.json + interfaces.hpp
        +--> dump/offsets.json + offsets.hpp
+       +--> dump/resolved_signatures.json
        +--> dump/dump_info.json
        +--> dump/update_report.json
        |
@@ -125,7 +126,7 @@ For signatures generated from offset references, add a `resolver` object:
 
 `rip_relative` resolves `match + add + displacement`. `instruction_displacement` reads the operand displacement and reports that value, which is useful for field offsets. `direct_match` keeps the old match-address behavior. `result_type` can be `absolute_address`, `module_rva`, `field_offset`, or `function_address`.
 
-When read-only offset dumping runs after a signature scan, resolved results from `cs2_signatures.json` are merged into `dump\offsets.json`. Module addresses are converted to RVAs when the module is loaded; field displacements are emitted as field offsets.
+When read-only offset dumping runs after a signature scan, curated offsets stay in `dump\offsets.json` and resolved results from `cs2_signatures.json` are written to `dump\resolved_signatures.json`. Module addresses are converted to RVAs when the module is loaded; field displacements are emitted as field offsets. Curated offsets include validation status and a validation error when a result looks unsafe.
 
 `category`, `importance`, and `required` feed scanner health. `game` and `module` are required unless the JSON says otherwise. `library`, `runtime`, `thunk`, and `auto` are optional.
 
@@ -172,7 +173,7 @@ When read-only offset dumping runs after a signature scan, resolved results from
 |--------|--------|---------|
 | `--dump-schemas` | `dump\schemas\<module>.json/.hpp` | Source 2 schema classes, fields, enums, inheritance, and metadata |
 | `--dump-interfaces` | `dump\interfaces.json/.hpp` | Interface registry entries discovered through `CreateInterface` exports |
-| `--dump-offsets` | `dump\offsets.json/.hpp` | Curated offsets such as `dwEntityList`, `dwGlobalVars`, `dwViewMatrix`, and `dwBuildNumber` |
+| `--dump-offsets` | `dump\offsets.json/.hpp`, `dump\resolved_signatures.json` | Curated offsets plus resolved signature results when `cs2_signatures.json` is present |
 | `--dump-info` | `dump\dump_info.json` | Timestamp, process ID, loaded modules, build number when available, and dumper status |
 | `--dump-all` | all of the above | Convenience mode |
 

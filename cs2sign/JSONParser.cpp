@@ -51,6 +51,9 @@ bool ParseIntegerString(const std::string& value, std::int64_t& result) {
 
 bool ReadInteger(const JsonValue& value, std::int64_t& result) {
     if (value.type == JsonValue::Type::Number) {
+        if (!value.numberIsInteger) {
+            return false;
+        }
         result = value.numberValue;
         return true;
     }
