@@ -213,6 +213,19 @@ struct KnownOffsetInfo {
     std::string resultType = "module_rva";
 };
 
+struct ResolvedSignatureInfo {
+    std::string module;
+    std::string name;
+    std::string resultType;
+    std::string valueField = "module_rva";
+    std::uint32_t value = 0;
+};
+
+struct OffsetDumpResult {
+    DumperStatus knownOffsets;
+    DumperStatus resolvedSignatures;
+};
+
 template <typename T>
 bool ReadRemote(ProcessMemoryReader& process, std::uint64_t address, T& value) {
     if (address == 0 || address > static_cast<std::uint64_t>((std::numeric_limits<uintptr_t>::max)())) {
@@ -1212,21 +1225,6 @@ std::string NormalizeModuleName(std::string module) {
     return module;
 }
 
-void UpsertKnownOffset(std::vector<KnownOffsetInfo>& offsets, KnownOffsetInfo info) {
-    auto offsetIt = std::find_if(offsets.begin(), offsets.end(), [&](const KnownOffsetInfo& offset) {
-        return offset.module == info.module && offset.name == info.name;
-    });
-
-    if (offsetIt == offsets.end()) {
-        offsets.push_back(std::move(info));
-        return;
-    }
-
-    if (!offsetIt->found || info.source == "resolved_signature") {
-        *offsetIt = std::move(info);
-    }
-}
-
 std::optional<std::uint32_t> ResolveModuleRvaFromAddress(
     const std::vector<ProcessModule>& modules,
     const std::string& preferredModule,
@@ -1263,10 +1261,11 @@ std::optional<std::uint32_t> ResolveModuleRvaFromAddress(
     return std::nullopt;
 }
 
-size_t AddResolvedSignatureOffsets(ProcessMemoryReader& process, std::vector<KnownOffsetInfo>& offsets) {
+std::vector<ResolvedSignatureInfo> ReadResolvedSignatures(ProcessMemoryReader& process) {
+    std::vector<ResolvedSignatureInfo> signatures;
     const std::filesystem::path scanPath = "cs2_signatures.json";
     if (!std::filesystem::exists(scanPath)) {
-        return 0;
+        return signatures;
     }
 
     std::ifstream file(scanPath);
@@ -1278,16 +1277,15 @@ size_t AddResolvedSignatureOffsets(ProcessMemoryReader& process, std::vector<Kno
     std::string error;
     JsonReader reader(jsonText);
     if (!reader.Parse(root, error) || root.type != JsonValue::Type::Object) {
-        return 0;
+        return signatures;
     }
 
     const auto signaturesIt = root.objectValue.find("signatures");
     if (signaturesIt == root.objectValue.end() || signaturesIt->second.type != JsonValue::Type::Array) {
-        return 0;
+        return signatures;
     }
 
     const std::vector<ProcessModule> modules = process.GetModules();
-    size_t addedCount = 0;
 
     for (const JsonValue& signature : signaturesIt->second.arrayValue) {
         bool found = false;
@@ -1309,11 +1307,9 @@ size_t AddResolvedSignatureOffsets(ProcessMemoryReader& process, std::vector<Kno
         module = NormalizeModuleName(module);
 
         std::uint64_t value = 0;
-        KnownOffsetInfo info;
+        ResolvedSignatureInfo info;
         info.module = module;
         info.name = name;
-        info.found = true;
-        info.source = "resolved_signature";
         info.resultType = resultType;
 
         if (resultType == "field_offset") {
@@ -1325,9 +1321,9 @@ size_t AddResolvedSignatureOffsets(ProcessMemoryReader& process, std::vector<Kno
             if (!ParseIntegerText(fieldOffset, value) || value > (std::numeric_limits<std::uint32_t>::max)()) {
                 continue;
             }
-            info.rva = static_cast<std::uint32_t>(value);
-            UpsertKnownOffset(offsets, std::move(info));
-            ++addedCount;
+            info.valueField = "field_offset";
+            info.value = static_cast<std::uint32_t>(value);
+            signatures.push_back(std::move(info));
             continue;
         }
 
@@ -1336,9 +1332,8 @@ size_t AddResolvedSignatureOffsets(ProcessMemoryReader& process, std::vector<Kno
             if (!ParseIntegerText(moduleRva, value) || value > (std::numeric_limits<std::uint32_t>::max)()) {
                 continue;
             }
-            info.rva = static_cast<std::uint32_t>(value);
-            UpsertKnownOffset(offsets, std::move(info));
-            ++addedCount;
+            info.value = static_cast<std::uint32_t>(value);
+            signatures.push_back(std::move(info));
             continue;
         }
 
@@ -1354,12 +1349,11 @@ size_t AddResolvedSignatureOffsets(ProcessMemoryReader& process, std::vector<Kno
         }
 
         info.module = resolvedModule;
-        info.rva = *rva;
-        UpsertKnownOffset(offsets, std::move(info));
-        ++addedCount;
+        info.value = *rva;
+        signatures.push_back(std::move(info));
     }
 
-    return addedCount;
+    return signatures;
 }
 
 std::vector<KnownOffsetInfo> ReadKnownOffsets(ProcessMemoryReader& process) {
@@ -1403,7 +1397,6 @@ std::vector<KnownOffsetInfo> ReadKnownOffsets(ProcessMemoryReader& process) {
     }
 
     AddDerivedOffsets(images, offsets);
-    AddResolvedSignatureOffsets(process, offsets);
     return offsets;
 }
 
@@ -1427,6 +1420,27 @@ void WriteOffsetsJson(const std::filesystem::path& outputPath, const std::vector
             file << "      \"error\": \"" << EscapeJson(offset.error) << "\"\n";
         }
         file << "    }" << (index + 1 == offsets.size() ? "" : ",") << "\n";
+    }
+    file << "  ]\n";
+    file << "}\n";
+}
+
+void WriteResolvedSignaturesJson(
+    const std::filesystem::path& outputPath,
+    const std::vector<ResolvedSignatureInfo>& signatures
+) {
+    std::ofstream file(outputPath);
+    file << "{\n";
+    file << "  \"resolved_signatures\": [\n";
+    for (size_t index = 0; index < signatures.size(); ++index) {
+        const ResolvedSignatureInfo& signature = signatures[index];
+        file << "    {\n";
+        file << "      \"module\": \"" << EscapeJson(signature.module) << "\",\n";
+        file << "      \"name\": \"" << EscapeJson(signature.name) << "\",\n";
+        file << "      \"source\": \"cs2_signatures.json\",\n";
+        file << "      \"result_type\": \"" << EscapeJson(signature.resultType) << "\",\n";
+        file << "      \"" << EscapeJson(signature.valueField) << "\": \"" << FormatHex(signature.value) << "\"\n";
+        file << "    }" << (index + 1 == signatures.size() ? "" : ",") << "\n";
     }
     file << "  ]\n";
     file << "}\n";
@@ -1464,20 +1478,23 @@ void WriteOffsetsHpp(const std::filesystem::path& outputPath, const std::vector<
     file << "} // namespace cs2::offsets\n";
 }
 
-DumperStatus DumpKnownOffsets(
+OffsetDumpResult DumpKnownOffsets(
     ProcessMemoryReader& process,
     const std::filesystem::path& outputDirectory,
     std::optional<std::uint32_t>& buildNumber
 ) {
-    DumperStatus status;
-    status.name = "known_offsets";
+    OffsetDumpResult result;
+    result.knownOffsets.name = "known_offsets";
+    result.resolvedSignatures.name = "resolved_signatures";
 
     if (!EnsureDirectory(outputDirectory)) {
-        status.error = "failed to create output directory";
-        return status;
+        result.knownOffsets.error = "failed to create output directory";
+        result.resolvedSignatures.error = "failed to create output directory";
+        return result;
     }
 
     std::vector<KnownOffsetInfo> offsets = ReadKnownOffsets(process);
+    const std::vector<ResolvedSignatureInfo> resolvedSignatures = ReadResolvedSignatures(process);
 
     if (const auto buildNumberRva = FindKnownOffsetRva(offsets, "engine2.dll", "dwBuildNumber")) {
         ProcessModule engineModule{};
@@ -1492,6 +1509,7 @@ DumperStatus DumpKnownOffsets(
 
     WriteOffsetsJson(outputDirectory / "offsets.json", offsets);
     WriteOffsetsHpp(outputDirectory / "offsets.hpp", offsets);
+    WriteResolvedSignaturesJson(outputDirectory / "resolved_signatures.json", resolvedSignatures);
 
     size_t foundCount = 0;
     for (const KnownOffsetInfo& offset : offsets) {
@@ -1500,9 +1518,11 @@ DumperStatus DumpKnownOffsets(
         }
     }
 
-    status.success = true;
-    status.itemCount = foundCount;
-    return status;
+    result.knownOffsets.success = true;
+    result.knownOffsets.itemCount = foundCount;
+    result.resolvedSignatures.success = true;
+    result.resolvedSignatures.itemCount = resolvedSignatures.size();
+    return result;
 }
 
 void WriteDumpInfo(
@@ -1597,9 +1617,21 @@ void RunReadOnlyDumpers(
     }
 
     if (options.dumpOffsets) {
-        RunOneDumper(report, "known_offsets", [&]() {
-            return DumpKnownOffsets(process, options.outputDirectory, report.buildNumber);
-        });
+        try {
+            const OffsetDumpResult result = DumpKnownOffsets(
+                process,
+                options.outputDirectory,
+                report.buildNumber
+            );
+            report.statuses.push_back(result.knownOffsets);
+            report.statuses.push_back(result.resolvedSignatures);
+        } catch (const std::exception& exception) {
+            report.statuses.push_back({ "known_offsets", false, exception.what(), 0 });
+            report.statuses.push_back({ "resolved_signatures", false, exception.what(), 0 });
+        } catch (...) {
+            report.statuses.push_back({ "known_offsets", false, "unknown failure", 0 });
+            report.statuses.push_back({ "resolved_signatures", false, "unknown failure", 0 });
+        }
     }
 
     if (options.dumpInfo) {

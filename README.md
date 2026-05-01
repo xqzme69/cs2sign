@@ -171,7 +171,7 @@ Supported resolver types are `rip_relative`, `instruction_displacement`, and `di
 
 Signature scan results are written to `cs2_signatures.json` in the current working directory. Each result includes `status`, `importance`, `required`, `ida_pattern`, `code_style_pattern`, `result_type`, and `resolver_status` so the dump can be reviewed or copied into C++ code more easily.
 
-When read-only offset dumping runs after a signature scan, resolved signature results are imported into `dump\offsets.json`. RIP-relative results are stored as module RVAs when the target address belongs to a loaded module. `instruction_displacement` results are stored as field offsets.
+When read-only offset dumping runs after a signature scan, curated offsets stay in `dump\offsets.json` and resolved scan results are written separately to `dump\resolved_signatures.json`. RIP-relative results are stored as module RVAs when the target address belongs to a loaded module. `instruction_displacement` results are stored as field offsets.
 
 Every run writes `dump\update_report.json` with signature health, dumper status, SDK status, build number when available, and loaded modules.
 
@@ -184,6 +184,7 @@ dump\interfaces.json
 dump\interfaces.hpp
 dump\offsets.json
 dump\offsets.hpp
+dump\resolved_signatures.json
 dump\schemas\<module>.json
 dump\schemas\<module>.hpp
 dump\sdk\cpp\<module>.hpp

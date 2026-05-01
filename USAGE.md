@@ -181,6 +181,7 @@ dump\interfaces.json
 dump\interfaces.hpp
 dump\offsets.json
 dump\offsets.hpp
+dump\resolved_signatures.json
 dump\schemas\<module>.json
 dump\schemas\<module>.hpp
 ```
@@ -233,6 +234,10 @@ Required signatures affect update health. Optional signatures are still reported
 ### `dump\offsets.json`
 
 Written by `--dump-offsets`. Contains curated offsets such as `dwEntityList`, `dwGlobalVars`, `dwViewMatrix`, and `dwBuildNumber`.
+
+### `dump\resolved_signatures.json`
+
+Written by `--dump-offsets` when `cs2_signatures.json` is present. Contains resolved scan results separately from curated offsets. Each entry uses `module_rva` or `field_offset` depending on what the resolver produced.
 
 ### `dump\interfaces.json`
 
