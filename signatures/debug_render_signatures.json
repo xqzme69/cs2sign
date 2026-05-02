@@ -1,0 +1,102 @@
+{
+  "_metadata": {
+    "schema_version": 1,
+    "module": "client",
+    "category": "debug_render",
+    "source": "local_research",
+    "source_project": "local_debug_render_research",
+    "status": "experimental",
+    "notes": "Optional Source 2 debug render function signatures. cs2sign only scans and reports these addresses; it does not call them."
+  },
+  "DebugDrawScreenTextLine": {
+    "pattern": "48 83 EC ? 48 8B 0D ? ? ? ? 48 85 C9 74 ? 8B 84 24 ? ? ? ? F3 0F 10 94 24",
+    "ida_pattern": "48 83 EC ? 48 8B 0D ? ? ? ? 48 85 C9 74 ? 8B 84 24 ? ? ? ? F3 0F 10 94 24",
+    "module": "client",
+    "category": "debug_render",
+    "importance": "experimental",
+    "required": false,
+    "status": "experimental",
+    "source": "local_research",
+    "source_project": "local_debug_render_research",
+    "rva": "0x00AFD450",
+    "address_offset": 0
+  },
+  "DebugScreenTextPretty": {
+    "pattern": "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 1D ? ? ? ? 49 8B F9",
+    "ida_pattern": "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 1D ? ? ? ? 49 8B F9",
+    "module": "client",
+    "category": "debug_render",
+    "importance": "experimental",
+    "required": false,
+    "status": "experimental",
+    "source": "local_research",
+    "source_project": "local_debug_render_research",
+    "rva": "0x00AFD4C0",
+    "address_offset": 0
+  },
+  "DebugDrawText3D": {
+    "pattern": "48 83 EC ? 4C 8B D1 48 8B 0D ? ? ? ? 48 85 C9 74 ? ? ? ? 4C 8D 0D",
+    "ida_pattern": "48 83 EC ? 4C 8B D1 48 8B 0D ? ? ? ? 48 85 C9 74 ? ? ? ? 4C 8D 0D",
+    "module": "client",
+    "category": "debug_render",
+    "importance": "experimental",
+    "required": false,
+    "status": "experimental",
+    "source": "local_research",
+    "source_project": "local_debug_render_research",
+    "rva": "0x00AFF7F0",
+    "address_offset": 0
+  },
+  "DebugDrawLine": {
+    "pattern": "48 83 EC ? 4C 8B D9 48 8B 0D ? ? ? ? 48 85 C9 74 ? 0F B6 84 24 ? ? ? ? F3 0F 10 8C 24",
+    "ida_pattern": "48 83 EC ? 4C 8B D9 48 8B 0D ? ? ? ? 48 85 C9 74 ? 0F B6 84 24 ? ? ? ? F3 0F 10 8C 24",
+    "module": "client",
+    "category": "debug_render",
+    "importance": "experimental",
+    "required": false,
+    "status": "experimental",
+    "source": "local_research",
+    "source_project": "local_debug_render_research",
+    "rva": "0x00AFAC50",
+    "address_offset": 0
+  },
+  "DebugDrawCircleOrSphere": {
+    "pattern": "48 83 EC ? 4C 8B D1 48 8B 0D ? ? ? ? 48 85 C9 74 ? 0F B6 84 24",
+    "ida_pattern": "48 83 EC ? 4C 8B D1 48 8B 0D ? ? ? ? 48 85 C9 74 ? 0F B6 84 24",
+    "module": "client",
+    "category": "debug_render",
+    "importance": "experimental",
+    "required": false,
+    "status": "experimental",
+    "source": "local_research",
+    "source_project": "local_debug_render_research",
+    "rva": "0x00AF27F0",
+    "address_offset": 0
+  },
+  "DebugDrawBoxDirection": {
+    "pattern": "48 89 6C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B E9 C7 44 24 ? 00 00 00 00",
+    "ida_pattern": "48 89 6C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B E9 C7 44 24 ? 00 00 00 00",
+    "module": "client",
+    "category": "debug_render",
+    "importance": "experimental",
+    "required": false,
+    "status": "experimental",
+    "source": "local_research",
+    "source_project": "local_debug_render_research",
+    "rva": "0x00AF22C0",
+    "address_offset": 0
+  },
+  "DebugDrawClear": {
+    "pattern": "48 83 EC ? 48 8B 0D ? ? ? ? 48 85 C9 74 ? ? ? ? 48 83 C4",
+    "ida_pattern": "48 83 EC ? 48 8B 0D ? ? ? ? 48 85 C9 74 ? ? ? ? 48 83 C4",
+    "module": "client",
+    "category": "debug_render",
+    "importance": "experimental",
+    "required": false,
+    "status": "experimental",
+    "source": "local_research",
+    "source_project": "local_debug_render_research",
+    "rva": "0x003B4730",
+    "address_offset": 0
+  }
+}

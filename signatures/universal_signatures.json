@@ -2271,18 +2271,31 @@
     "source_url": "https://raw.githubusercontent.com/scros22/cs2-universal-offsets/main/src/signatures/database.rs",
     "quality": "external"
   },
-  "AddStattrakEntity": {
-    "pattern": "48 8B C4 48 89 58 08 48 89 70 10 57 48 83 EC 50 33 F6 8B FA 48 8B D1",
-    "ida_pattern": "48 8B C4 48 89 58 08 48 89 70 10 57 48 83 EC 50 33 F6 8B FA 48 8B D1",
+  "AddKeychainEntity": {
+    "pattern": "44 88 44 24 ? 48 89 54 24 ? 55 53 56 57 41 54 41 55 41 56 41 57 48 8D AC 24",
+    "ida_pattern": "44 88 44 24 ? 48 89 54 24 ? 55 53 56 57 41 54 41 55 41 56 41 57 48 8D AC 24",
     "module": "client.dll",
-    "category": "cs2_universal_offsets",
+    "category": "cs2sign_manual",
     "importance": "optional",
     "required": false,
     "result_type": "absolute_address",
-    "source": "cs2_universal_offsets",
-    "source_project": "scros22/cs2-universal-offsets",
-    "source_url": "https://raw.githubusercontent.com/scros22/cs2-universal-offsets/main/src/signatures/database.rs",
-    "quality": "external"
+    "source": "manual_pattern",
+    "source_project": "cs2sign",
+    "rva": "0x78A200",
+    "quality": "manual_verified"
+  },
+  "AddStattrakEntity": {
+    "pattern": "48 89 5C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 55 41 54 41 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B DA",
+    "ida_pattern": "48 89 5C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 55 41 54 41 55 41 56 41 57 48 8D 6C 24 ? 48 81 EC ? ? ? ? 48 8B DA",
+    "module": "client.dll",
+    "category": "cs2sign_manual",
+    "importance": "optional",
+    "required": false,
+    "result_type": "absolute_address",
+    "source": "manual_pattern",
+    "source_project": "cs2sign",
+    "rva": "0x78B9E0",
+    "quality": "manual_verified"
   },
   "CreateSOSubclassEconItem": {
     "pattern": "48 83 EC 28 B9 48 00 00 00 E8 ? ? ? ? 48 85",

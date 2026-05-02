@@ -881,6 +881,22 @@
     "confidence": 90,
     "pattern_synth": "48 89 4C 24 08 53 56 57 41 54 41 55 41 56 41 57 48 83 EC 50 65 48 8B 04 25 58 00 00 00 45 33 E4"
   },
+  "screen_transform": {
+    "pattern": "48 89 5C 24 08 57 48 83 EC ? 48 83 3D ? ? ? ? ? 48 8B DA",
+    "ida_pattern": "48 89 5C 24 08 57 48 83 EC ? 48 83 3D ? ? ? ? ? 48 8B DA",
+    "module": "client",
+    "category": "render",
+    "importance": "experimental",
+    "required": false,
+    "status": "manual",
+    "source": "manual_pattern",
+    "source_project": "cs2sign",
+    "result_type": "function_address",
+    "rva": "0xB737D0",
+    "address_offset": 0,
+    "quality": "unknown",
+    "confidence": 80
+  },
   "statTrak_scoreType": {
     "pattern": "kill eater score type",
     "string_ref": "kill eater score type",

@@ -3,13 +3,18 @@
   "project": "cs2sign",
   "source": "github",
   "build": "14158",
-  "generated_at": "2026-05-02T16:50:22Z",
+  "generated_at": "2026-05-02T22:29:35Z",
   "base_url": "https://raw.githubusercontent.com/xqzme69/cs2sign/main/signatures/",
   "files": [
     {
       "name": "client_signatures.json",
-      "sha256": "58b7063e38498bf01965d98f81e166490241353d5d522b33fd06a6c073c3f79b",
-      "size": 32417
+      "sha256": "bb9abc45a6555212ac0d261c14b81548393fb1c752c4198e25fcd381b1822d03",
+      "size": 32930
+    },
+    {
+      "name": "debug_render_signatures.json",
+      "sha256": "e5280a52ce6fc8ba816fdad2ea5a47cbfdb30dd7e7df763f4388d7bb8ff32e8c",
+      "size": 3775
     },
     {
       "name": "dreamy_signatures.json",
@@ -48,8 +53,8 @@
     },
     {
       "name": "universal_signatures.json",
-      "sha256": "2f455d2fd5f8d6d39a1db8c8bef6d9b436690ff7c72de1cfd23c537157b40032",
-      "size": 260374
+      "sha256": "8eca0a80111c725398850c57e8b148c517fda402c1f5ad8abae139d0fbbc898f",
+      "size": 260828
     }
   ]
 }
