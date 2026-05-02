@@ -10,6 +10,8 @@
 #include "SignatureLoader.h"
 #include "SignatureScanner.h"
 
+#include <algorithm>
+#include <conio.h>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -36,6 +38,7 @@ struct RuntimeOptions {
     bool shouldRunSignatureScan = true;
     bool shouldPauseBeforeExit = true;
     bool shouldGenerateSdk = false;
+    bool failOnDegraded = false;
     bool showConsoleLogs = true;
     ReadOnlyDumpOptions dumpOptions;
 };
@@ -150,6 +153,7 @@ void PrintUsage() {
         << "  --dump-info        Write dump_info.json with timestamp, modules, and dumper status.\n"
         << "  --emit-sdk         Generate SDK files from dump\\schemas.\n"
         << "  --output <dir>     Output directory for read-only dumpers (default: dump).\n"
+        << "  --fail-on-degraded Exit non-zero when update health is bad or degraded.\n"
         << "  --no-pause         Exit immediately instead of waiting for a key press.\n"
         << "  --version          Show cs2sign version.\n"
         << "  --help             Show this help text.\n";
@@ -246,6 +250,11 @@ CommandLineParseResult ParseCommandLine(int argc, char* argv[]) {
 
         if (argument == "--no-pause") {
             parseResult.options.shouldPauseBeforeExit = false;
+            continue;
+        }
+
+        if (argument == "--fail-on-degraded") {
+            parseResult.options.failOnDegraded = true;
             continue;
         }
 
@@ -464,7 +473,7 @@ void PauseBeforeExitIfNeeded(bool shouldPauseBeforeExit) {
     Console::SetColor(Console::DARK_GRAY);
     std::cout << "\n  Press any key to exit...";
     Console::ResetColor();
-    system("pause >nul");
+    (void)_getch();
 }
 
 std::vector<std::string> FindSignatureJsonFilesInDirectory(const std::filesystem::path& directory) {
@@ -476,6 +485,7 @@ std::vector<std::string> FindSignatureJsonFilesInDirectory(const std::filesystem
         }
     }
 
+    std::sort(signatureFiles.begin(), signatureFiles.end());
     return signatureFiles;
 }
 
@@ -949,7 +959,7 @@ int main(int argc, char* argv[]) {
     }
 
     Console::Init();
-    system("title CS2 Signature Scanner - xqzme");
+    SetConsoleTitleW(L"CS2 Signature Scanner - xqzme");
     Console::PrintBanner();
 
     RuntimeOptions options = commandLine.options;
@@ -1092,9 +1102,11 @@ int main(int argc, char* argv[]) {
     }
 
     WriteUpdateReport(healthReport, options.dumpOptions.outputDirectory, processMemory);
+    const std::string finalHealth = DetermineHealthStatus(healthReport);
+    const int finalExitCode = options.failOnDegraded && finalHealth != "ok" ? 2 : 0;
 
     if (requiresProcess) {
         processMemory.Detach();
     }
-    return finishRun(0);
+    return finishRun(finalExitCode);
 }

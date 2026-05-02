@@ -18,6 +18,19 @@ bool ReadString(const JsonValue& value, std::string& result) {
     return true;
 }
 
+bool ReadObjectString(const JsonValue& object, const std::string& key, std::string& result) {
+    if (object.type != JsonValue::Type::Object) {
+        return false;
+    }
+
+    const auto field = object.objectValue.find(key);
+    if (field == object.objectValue.end()) {
+        return false;
+    }
+
+    return ReadString(field->second, result);
+}
+
 std::string Trim(std::string value) {
     const auto first = std::find_if_not(value.begin(), value.end(), [](unsigned char character) {
         return std::isspace(character);
@@ -42,7 +55,12 @@ std::string LowerAscii(std::string value) {
 
 bool ParseIntegerString(const std::string& value, std::int64_t& result) {
     try {
-        result = std::stoll(Trim(value), nullptr, 0);
+        const std::string text = Trim(value);
+        size_t parsedLength = 0;
+        result = std::stoll(text, &parsedLength, 0);
+        if (parsedLength != text.size()) {
+            return false;
+        }
         return true;
     } catch (...) {
         return false;
@@ -94,6 +112,8 @@ bool IsPatternField(const std::string& key) {
            key == "idaPattern" ||
            key == "ida_style" ||
            key == "idaStyle" ||
+           key == "string_ref" ||
+           key == "stringRef" ||
            key == "code_style_pattern" ||
            key == "codeStylePattern" ||
            key == "mask";
@@ -201,6 +221,55 @@ bool ConvertMaskedPatternToIda(
     return true;
 }
 
+int CountIdaPatternTokens(const std::string& idaPattern) {
+    std::istringstream stream(idaPattern);
+    int count = 0;
+    std::string token;
+    while (stream >> token) {
+        ++count;
+    }
+    return count;
+}
+
+bool ApplyCounterStrikeSharpGamedataEntry(SignatureEntry& entry, const JsonValue& value) {
+    const auto signaturesField = value.objectValue.find("signatures");
+    if (signaturesField == value.objectValue.end() ||
+        signaturesField->second.type != JsonValue::Type::Object) {
+        return false;
+    }
+
+    std::string windowsPattern;
+    if (!ReadObjectString(signaturesField->second, "windows", windowsPattern)) {
+        return false;
+    }
+
+    windowsPattern = Trim(windowsPattern);
+    if (windowsPattern.empty()) {
+        return false;
+    }
+
+    std::string library;
+    ReadObjectString(signaturesField->second, "library", library);
+    library = Trim(library);
+    if (library.empty()) {
+        library = "server";
+    }
+
+    entry.pattern = windowsPattern;
+    entry.module = library;
+    entry.category = "counterstrikesharp";
+    entry.quality = "external";
+    entry.importance = "optional";
+    entry.source = "counterstrikesharp_gamedata";
+    entry.sourceProject = "roflmuffin/CS2-Gamedata";
+    entry.sourceUrl = "https://github.com/roflmuffin/CS2-Gamedata";
+    entry.resultType = "function_address";
+    entry.length = CountIdaPatternTokens(windowsPattern);
+    entry.required = false;
+    entry.hasRequiredFlag = true;
+    return true;
+}
+
 void ApplyStringField(SignatureEntry& entry, const std::string& key, const std::string& value) {
     if (key == "module") entry.module = value;
     else if (key == "rva") entry.rva = value;
@@ -220,7 +289,7 @@ void ApplyPatternField(
     int& patternPriority,
     std::string& maskValue
 ) {
-    if (key == "pattern") {
+    if (key == "pattern" || key == "string_ref" || key == "stringRef") {
         if (patternPriority <= 1) {
             entry.pattern = value;
             patternPriority = 1;
@@ -412,7 +481,7 @@ bool JSONParser::LoadSignatures(
             }
         }
 
-        if (entry.pattern.empty()) {
+        if (entry.pattern.empty() && !ApplyCounterStrikeSharpGamedataEntry(entry, value)) {
             continue;
         }
 

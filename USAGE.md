@@ -72,6 +72,22 @@ To refresh the GitHub signature pack after generating new IDA JSON files, run:
 .\scripts\update-signatures.ps1
 ```
 
+To refresh optional community signatures from `scros22/cs2-universal-offsets`, run:
+
+```powershell
+.\scripts\import-cs2-universal-offsets.ps1
+```
+
+This writes `signatures\universal_signatures.json`, marks imported entries as optional, keeps source provenance on every entry, and refreshes `signatures\index.json`.
+
+To refresh optional DreamyDumper coverage, run:
+
+```powershell
+.\scripts\import-dreamydumper.ps1
+```
+
+This writes `signatures\dreamy_signatures.json`, imports only byte-pattern data that fits cs2sign's existing resolver model, skips exact duplicates and ambiguous field-offset patterns, and refreshes `signatures\index.json`.
+
 Optional cross-platform manifest check:
 
 ```powershell
@@ -89,7 +105,7 @@ Put generated files such as `client_signatures.json` and `engine2_signatures.jso
 Scan signatures from a specific directory:
 
 ```powershell
-.\cs2sign\x64\Release\cs2sign.exe .\signatures --no-pause
+.\cs2sign\x64\Release\cs2sign.exe .\signatures --fail-on-degraded --no-pause
 ```
 
 Scan one JSON file:
@@ -218,6 +234,7 @@ This command reads `dump\schemas\*.json` and does not require CS2 to be running.
 | `--dump-info` | Write timestamp, module list, build number, and dumper status |
 | `--emit-sdk` | Generate `dump\sdk\cpp`, `csharp`, `rust`, `zig`, and `ida.h` from schema JSON |
 | `--output <dir>` | Set read-only dumper output directory |
+| `--fail-on-degraded` | Return exit code 2 when update health is bad or degraded |
 | `--no-pause` | Exit without waiting for a key press |
 | `--version` | Print the cs2sign version |
 | `--help` | Print help text |
@@ -307,7 +324,7 @@ Signature health is based on required signatures. Optional misses are shown for 
 9. Run a local verification scan:
 
 ```powershell
-.\cs2sign\x64\Release\cs2sign.exe .\signatures --no-pause
+.\cs2sign\x64\Release\cs2sign.exe .\signatures --fail-on-degraded --no-pause
 ```
 
 10. Check `dump\update_report.json`. If health is `degraded` or `bad`, inspect the failed offsets/signatures before publishing the dump.

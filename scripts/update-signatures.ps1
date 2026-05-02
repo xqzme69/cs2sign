@@ -1,7 +1,7 @@
 param(
     [string]$Source = "cs2sign\x64\Release\cs2sign",
     [string]$Output = "signatures",
-    [string]$BaseUrl = "https://api.github.com/repos/xqzme69/cs2sign/contents/signatures/",
+    [string]$BaseUrl = "https://raw.githubusercontent.com/xqzme69/cs2sign/main/signatures/",
     [string]$Build = "cs2-current"
 )
 

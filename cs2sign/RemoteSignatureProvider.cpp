@@ -135,8 +135,8 @@ bool DownloadUrlOnce(HINTERNET session, const std::string& url, std::string& out
         return false;
     }
 
-    if (components.nScheme != INTERNET_SCHEME_HTTP && components.nScheme != INTERNET_SCHEME_HTTPS) {
-        error = "unsupported URL scheme";
+    if (components.nScheme != INTERNET_SCHEME_HTTPS) {
+        error = "unsupported URL scheme; HTTPS is required";
         return false;
     }
 

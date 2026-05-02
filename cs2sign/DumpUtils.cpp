@@ -168,14 +168,15 @@ bool ParseIdaPattern(std::string_view pattern, std::vector<PatternByte>& bytes) 
             continue;
         }
 
-        unsigned int value = 0;
-        std::istringstream hexStream(token);
-        hexStream >> std::hex >> value;
-        if (hexStream.fail() || value > 0xff) {
+        if (token.empty() || token.size() > 2 ||
+            !std::all_of(token.begin(), token.end(), [](unsigned char character) {
+                return std::isxdigit(character) != 0;
+            })) {
             bytes.clear();
             return false;
         }
 
+        const unsigned int value = static_cast<unsigned int>(std::stoul(token, nullptr, 16));
         bytes.push_back({ static_cast<std::uint8_t>(value), false });
     }
 

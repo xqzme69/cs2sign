@@ -359,6 +359,24 @@
       "module": "engine2.dll",
       "name": "dwNetworkGameClient_serverTickCount",
       "rva": "0x24C"
+    },
+    {
+      "build": 14158,
+      "module": "client.dll",
+      "name": "dwSensitivity",
+      "rva": "0x23298C8"
+    },
+    {
+      "build": 14158,
+      "module": "engine2.dll",
+      "name": "dwNetworkGameClient_clientTickCount",
+      "rva": "0x378"
+    },
+    {
+      "build": 14158,
+      "module": "engine2.dll",
+      "name": "dwNetworkGameClient_serverTickCount",
+      "rva": "0x24C"
     }
   ]
 }

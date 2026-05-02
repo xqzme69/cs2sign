@@ -126,11 +126,33 @@ For signatures generated from offset references, add a `resolver` object:
 }
 ```
 
-`rip_relative` resolves `match + add + displacement`. `instruction_displacement` reads the operand displacement and reports that value, which is useful for field offsets. `direct_match` keeps the old match-address behavior. `result_type` can be `absolute_address`, `module_rva`, `field_offset`, or `function_address`.
+`string_ref` entries use `pattern` or `string_ref` as a literal string. The scanner looks for it in `.rdata` or `.data`, finds a RIP-relative `lea` reference in `.text`, then reports the enclosing function:
+
+```json
+{
+  "CCSPlayerPawn_ctor": {
+    "string_ref": "CCSPlayerPawn",
+    "module": "client",
+    "result_type": "function_address",
+    "resolver": {
+      "type": "string_ref",
+      "result_type": "function_address"
+    }
+  }
+}
+```
+
+`rip_relative` resolves `match + add + displacement`. `instruction_displacement` reads the operand displacement and reports that value, which is useful for field offsets. `direct_match` keeps the old match-address behavior. `string_ref` resolves a string xref to a function entry. `result_type` can be `absolute_address`, `module_rva`, `field_offset`, or `function_address`.
 
 When read-only offset dumping runs after a signature scan, curated offsets stay in `dump\offsets.json` and resolved results from `cs2_signatures.json` are written to `dump\resolved_signatures.json`. Module addresses are converted to RVAs when the module is loaded; field displacements are emitted as field offsets. Curated offsets include validation status and a validation error when a result looks unsafe.
 
 `category`, `importance`, and `required` feed scanner health. `game` and `module` are required unless the JSON says otherwise. `library`, `runtime`, `thunk`, and `auto` are optional.
+
+The loader also accepts CounterStrikeSharp gamedata from `roflmuffin/CS2-Gamedata`. Records with `signatures.windows` are loaded as optional `function_address` signatures, and `signatures.library` becomes the module filter. Offset-only records are skipped because they do not contain byte patterns. `scripts\sync-counterstrikesharp-gamedata.ps1` vendors the upstream `latest.json` into `signatures\server_signatures.json` and refreshes `signatures\index.json`.
+
+`scripts\import-cs2-universal-offsets.ps1` imports the signature database from `scros22/cs2-universal-offsets` into `signatures\universal_signatures.json`. Imported entries are optional, retain source provenance, and map upstream `None`, `Rel32`, `RipRel`, and `StringRef` modes onto cs2sign's direct-match, `rip_relative`, and `string_ref` resolver model. Existing local module/name pairs are skipped by default so the upstream pack expands coverage without overriding maintained signatures.
+
+`scripts\import-dreamydumper.ps1` imports useful byte-pattern data from `CBXPL/DreamyDumper` into `signatures\dreamy_signatures.json`. Manual function/global patterns become optional signatures, and supported `2_0_dumps` field patterns become optional `field_offset` signatures using the existing `instruction_displacement` resolver. The importer skips exact duplicates and ambiguous normalized field patterns because the scanner cannot safely bind multiple field names to the same wildcarded byte sequence.
 
 **Hotkey:** Ctrl-Shift-S (when loaded as IDA plugin)
 
@@ -324,7 +346,8 @@ struct Signature {
 `ScanAll()`:
 1. For each signature, iterates over all memory regions
 2. **Module filtering**: if a signature specifies a module (e.g., `"client"`), only regions belonging to that module's DLL are scanned
-3. After each signature, updates `cs2_signatures.json` with current results
+3. `string_ref` signatures use the target module's `.rdata`/`.data` and `.text` sections instead of process-wide region scanning
+4. After each signature, updates `cs2_signatures.json` with current results
 
 **Module filtering code:**
 ```cpp
@@ -379,9 +402,9 @@ struct SignatureEntry {
 
 **Single function:** `LoadSignaturesFromJSON(scanner, filepath)`
 
-1. Reads JSON file via `JSONParser::ParseFile()`
+1. Reads JSON file via `JSONParser::LoadSignatures()`
 2. For each entry, calls `scanner.AddSignatureFromIDA(name, pattern, module, rva, addressOffset)`
-3. Returns count of loaded signatures (or -1 on error)
+3. Returns the count of signatures actually accepted by the scanner (or -1 on error)
 
 ---
 
@@ -390,7 +413,7 @@ struct SignatureEntry {
 **Purpose:** Colorful console output with Windows console API.
 
 **Features:**
-- ANSI color support via `SetConsoleMode(ENABLE_VIRTUAL_TERMINAL_PROCESSING)`
+- Windows console colors via `SetConsoleTextAttribute`
 - Color enum: RED, GREEN, YELLOW, CYAN, MAGENTA, WHITE, DARK_GRAY
 - `PrintBanner()` — animated "XQZME" ASCII art with magenta gradient
 - `PrintHeader(title)` / `PrintFooter()` — section delimiters
@@ -454,7 +477,7 @@ Output JSON format:
     "game": "Counter-Strike 2",
     "process_id": 2208,
     "total_signatures": 392,
-    "scan_time": "Apr 13 2026 21:40:56"
+    "scan_time": "2026-05-02T01:40:56Z"
   },
   "signatures": [
     {
@@ -652,6 +675,8 @@ cs2sign/
     build.ps1              # Build helper
     clean.ps1              # Local artifact cleanup helper
     update-signatures.ps1  # Rebuild signatures/index.json for GitHub mode
+    sync-counterstrikesharp-gamedata.ps1 # Convert upstream server gamedata into signatures/
+    compare-scan-results.ps1 # Diff two cs2_signatures.json runtime outputs
     verify-signatures.ps1  # Validate published signature hashes and line endings
     verify-sdk.ps1         # Generate and syntax-check SDK output from fixtures
   docs/

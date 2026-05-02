@@ -55,6 +55,7 @@ struct Signature {
     uintptr_t resolvedAddress;
     std::uint32_t moduleRva;
     bool hasModuleRva;
+    std::string patternSynth;
     std::string resolverStatus;
     bool found;
     std::string error;
@@ -72,7 +73,7 @@ public:
     void AddSignature(const std::string& name, const char* pattern, size_t patternLen, const std::string& mask, intptr_t offset = 0);
 
     // Add signature from IDA-style pattern string: "48 89 5C 24 ? 57"
-    void AddSignatureFromIDA(const std::string& name, const std::string& idaPattern,
+    bool AddSignatureFromIDA(const std::string& name, const std::string& idaPattern,
                              const std::string& module = "", const std::string& rva = "",
                              intptr_t addressOffset = 0, const std::string& category = "",
                              const std::string& quality = "", const std::string& importance = "",
@@ -106,6 +107,7 @@ private:
         const Signature& signature,
         const std::vector<MemoryRegion>& candidateRegions
     );
+    SignatureScanOutcome ScanStringReferenceSignature(const Signature& signature);
     SignatureScanOutcome ScanSignatureRegions(
         const Signature& signature,
         const std::vector<MemoryRegion>& scanRegions,
@@ -114,10 +116,19 @@ private:
     void RecordFoundSignature(Signature& signature, const SignatureScanOutcome& outcome);
     void RecordMissingSignature(Signature& signature, const SignatureScanOutcome& outcome);
     bool ResolveSignatureAddress(Signature& signature, uintptr_t matchAddress);
+    std::string BuildPatternSynth(uintptr_t address);
     void WriteResultsJSON(std::ofstream& file);
 
     uintptr_t ScanPattern(uintptr_t start, size_t size, const std::vector<PatternByte>& pattern, std::string& error);
     uintptr_t ScanPatternOptimized(uintptr_t start, size_t size, const std::vector<PatternByte>& pattern, std::string& error);
+    uintptr_t ScanPatternOptimized(
+        uintptr_t start,
+        size_t size,
+        const std::vector<PatternByte>& pattern,
+        std::string& error,
+        const Signature* signature
+    );
+    bool MatchResolverExpected(const Signature& signature, uintptr_t matchAddress, std::string& error);
     bool ComparePattern(const uint8_t* memoryBytes, const std::vector<PatternByte>& pattern);
 
     ProcessMemoryReader& m_memory;

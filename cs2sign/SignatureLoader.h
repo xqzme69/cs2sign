@@ -76,7 +76,7 @@ inline int LoadSignaturesFromJSON(SignatureScanner& scanner, const std::string& 
             ? (required ? "required" : "optional")
             : entry.importance;
 
-        scanner.AddSignatureFromIDA(
+        if (!scanner.AddSignatureFromIDA(
             entry.name,
             entry.pattern,
             entry.module,
@@ -93,7 +93,10 @@ inline int LoadSignaturesFromJSON(SignatureScanner& scanner, const std::string& 
             required,
             ToSignatureResolver(entry.resolver),
             entry.resultType
-        );
+        )) {
+            skipped++;
+            continue;
+        }
         loaded++;
     }
 

@@ -93,6 +93,7 @@ Useful options:
 --dump-info        Write dump_info.json with timestamp, modules, and dumper status.
 --emit-sdk         Generate SDK files from dump\schemas.
 --output <dir>     Output directory for read-only dumpers (default: dump).
+--fail-on-degraded Exit non-zero when update health is bad or degraded.
 --no-pause         Exit immediately instead of waiting for a key press.
 --version          Show cs2sign version.
 --help             Show usage.
@@ -101,7 +102,7 @@ Useful options:
 Example for scripts/CI:
 
 ```powershell
-.\cs2sign\x64\Release\cs2sign.exe .\signatures --no-pause
+.\cs2sign\x64\Release\cs2sign.exe .\signatures --fail-on-degraded --no-pause
 ```
 
 Run only the read-only dumpers:
@@ -167,13 +168,35 @@ Entries can also include a `resolver` object when the match should resolve to a 
 }
 ```
 
-Supported resolver types are `rip_relative`, `instruction_displacement`, and `direct_match`. Supported result types are `absolute_address`, `module_rva`, `field_offset`, and `function_address`.
+`string_ref` resolver entries use the `pattern` value as a literal string. The scanner finds the string in `.rdata`/`.data`, finds a RIP-relative `lea` reference in `.text`, and reports the enclosing function:
+
+```json
+{
+  "CCSPlayerPawn_ctor": {
+    "pattern": "CCSPlayerPawn",
+    "module": "client",
+    "result_type": "function_address",
+    "resolver": {
+      "type": "string_ref",
+      "result_type": "function_address"
+    }
+  }
+}
+```
+
+Supported resolver types are `rip_relative`, `instruction_displacement`, `direct_match`, and `string_ref`. Supported result types are `absolute_address`, `module_rva`, `field_offset`, and `function_address`.
 
 `category`, `importance`, and `required` feed the update report. `game` and `module` signatures count as required unless the JSON says otherwise. `library`, `runtime`, `thunk`, and `auto` signatures count as optional.
 
+CounterStrikeSharp gamedata files from `roflmuffin/CS2-Gamedata` are accepted as an input format too. Entries with `signatures.windows` are loaded as optional `function_address` signatures, using `signatures.library` as the target module. Offset-only records are skipped because they are metadata, not byte patterns. To vendor the current upstream server signatures into this repo, run:
+
+```powershell
+.\scripts\sync-counterstrikesharp-gamedata.ps1
+```
+
 ## Output
 
-Signature scan results are written to `cs2_signatures.json` in the current working directory. Each result includes `status`, `importance`, `required`, `ida_pattern`, `code_style_pattern`, `result_type`, and `resolver_status` so the dump can be reviewed or copied into C++ code more easily.
+Signature scan results are written to `cs2_signatures.json` in the current working directory. Each result includes `status`, `importance`, `required`, `ida_pattern`, `code_style_pattern`, `result_type`, and `resolver_status` so the dump can be reviewed or copied into C++ code more easily. Resolved functions also include a best-effort `pattern_synth` field with relocatable bytes wildcarded.
 
 When read-only offset dumping runs after a signature scan, curated offsets stay in `dump\offsets.json` and resolved scan results are written separately to `dump\resolved_signatures.json`. RIP-relative results are stored as module RVAs, immediate displacement results are stored as field offsets, and curated offsets include validation status so bad module RVAs or unreasonable field offsets are visible in the dump.
 
@@ -207,7 +230,11 @@ Those files are generated output and are ignored by git.
 - GitHub mode uses `signatures/index.json` and the matching `signatures/*_signatures.json` files.
 - `tools/targets/cs2_targets.json` lists important signatures and curated known offsets that must not disappear silently.
 - `tools/targets/known_offsets.json` is the source file for curated known offset scan patterns; it is embedded as a Windows resource at build time.
+- `scripts\sync-counterstrikesharp-gamedata.ps1` converts `roflmuffin/CS2-Gamedata` `latest.json` into `signatures\server_signatures.json` and refreshes `signatures\index.json`.
+- `scripts\import-cs2-universal-offsets.ps1` imports optional signatures from `scros22/cs2-universal-offsets` into `signatures\universal_signatures.json` and refreshes `signatures\index.json`.
+- `scripts\import-dreamydumper.ps1` imports optional manual and field-offset signatures from `CBXPL/DreamyDumper` into `signatures\dreamy_signatures.json`, skips duplicate/ambiguous upstream patterns, and refreshes `signatures\index.json`.
 - `scripts\compare-signatures.ps1` compares a candidate signature pack against the current published pack and fails on suspicious drops.
+- `scripts\compare-scan-results.ps1` compares two `cs2_signatures.json` runtime outputs and reports added, removed, moved, status-changed, and pattern-changed entries.
 - `scripts\verify-targets.ps1` validates the maintainer target registry against the published signature pack.
 - `tools\sigindex-checker` is an optional Rust helper for local signature index/hash checks.
 - License and third-party notices are tracked in [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
@@ -217,4 +244,5 @@ Those files are generated output and are ignored by git.
 - Legacy built-in signatures are stale-prone after CS2 updates. They are disabled by default.
 - The minimal JSON parser is designed for this project's generated format, not arbitrary JSON.
 - The scanner reports addresses; it does not validate semantic correctness of each match.
+- Use `--fail-on-degraded` in automation when missing required signatures should fail the process.
 - C#, Rust, and Zig SDK files expose schema offsets as constants. The C++ SDK keeps the packed struct layout.

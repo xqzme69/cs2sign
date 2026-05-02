@@ -1,0 +1,27 @@
+{
+  "_metadata": {
+    "generator": "manual_string_ref",
+    "module": "networksystem",
+    "source_project": "cs2sign",
+    "signatures_generated": 1
+  },
+  "CNetChan_ProcessMessages": {
+    "pattern": "CNetChan::ProcessMessages",
+    "string_ref": "CNetChan::ProcessMessages",
+    "module": "networksystem",
+    "category": "string_ref",
+    "importance": "optional",
+    "required": false,
+    "result_type": "function_address",
+    "resolver": {
+      "type": "string_ref",
+      "result_type": "function_address"
+    },
+    "source": "manual_string_ref",
+    "source_project": "cs2sign",
+    "rva": "0xBB280",
+    "quality": "good",
+    "confidence": 90,
+    "pattern_synth": "48 8B C4 53 57 41 54 41 56 48 81 EC A8 00 00 00 48 89 70 D0 45 33 E4 4C 89 68 C8 48 8B D9 48 89"
+  }
+}

@@ -112,23 +112,24 @@ bool ProcessMemoryReader::ReadBuffer(uintptr_t address, size_t size, std::vector
     }
 
     constexpr size_t pageSize = 0x1000;
-    bool readAnyPage = false;
+    bool readAllPages = true;
 
     for (size_t offset = 0; offset < size; offset += pageSize) {
         const size_t chunkSize = (std::min)(pageSize, size - offset);
         SIZE_T bytesRead = 0;
-        if (ReadProcessMemory(
+        if (!ReadProcessMemory(
                 m_hProcess,
                 reinterpret_cast<LPCVOID>(address + offset),
                 buffer.data() + offset,
                 chunkSize,
                 &bytesRead
-            ) && bytesRead > 0) {
-            readAnyPage = true;
+            ) ||
+            bytesRead != chunkSize) {
+            readAllPages = false;
         }
     }
 
-    return readAnyPage;
+    return readAllPages;
 }
 
 uintptr_t ProcessMemoryReader::GetModuleBase(const std::wstring& moduleName) {
