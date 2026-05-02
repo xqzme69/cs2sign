@@ -1,3 +1,10 @@
+# cs2_sig_dumper.py
+#
+# Писал и тестил на IDA 9.2 Pro + Windows 11.
+# На 9.0-9.1 должно работать без изменений.
+# Если у тебя 8.x или младше - могут быть мелкие проблемы с API.
+#
+
 import hashlib
 import json
 import os

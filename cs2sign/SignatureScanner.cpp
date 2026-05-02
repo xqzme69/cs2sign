@@ -68,6 +68,8 @@ size_t DetermineWorkerThreadCount() {
     if (workerThreadCount > 8) {
         workerThreadCount = 8;
     }
+    // На моей 5950X больше 8 потоков уже не давало прироста,
+    // зато процессор сильно грелся. Поэтому ограничил.
     return workerThreadCount;
 }
 

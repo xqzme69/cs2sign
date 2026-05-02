@@ -19,6 +19,11 @@
 #include <string>
 #include <vector>
 
+// Примечание:
+// Проект начал собираться как простой сканер для личного использования,
+// потом постепенно разросся. Некоторые части (особенно генераторы SDK)
+// писались довольно быстро, поэтому местами может быть немного кривовато.
+
 namespace {
 constexpr const char* kCs2SignVersion = "0.1.10";
 constexpr const char* kDefaultSignatureInputPath = "signatures.json";
@@ -93,6 +98,9 @@ public:
     ~ScopedQuietAnimation() {
         Stop();
     }
+
+    // Просто чтобы во время анимации не засорять консоль.
+    // Сделал, потому что захотелось.
 
     void CompleteAndStop() {
         if (!enabled_) {

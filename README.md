@@ -2,9 +2,18 @@
 
 Read-only Counter-Strike 2 signature scanner and dumper.
 
-`cs2sign` opens a running `cs2.exe` process with query/read rights, loads byte-pattern signatures, scans readable memory regions, and writes matches to `cs2_signatures.json`.
+`cs2sign` opens a running `cs2.exe` process with read rights, loads byte-pattern signatures, scans memory and writes results to JSON. It can also dump Source 2 schemas, interfaces and generate SDKs in multiple languages.
 
-The repo contains the C++ scanner, the IDA signature plugin at `tools/ida/cs2_sig_dumper.py`, read-only dumpers for schemas/interfaces/known offsets, and a multi-language SDK generator.
+## Why this exists
+
+I got tired of manually updating signatures every time a new CS2 build dropped.
+Started with a small personal tool, then decided to make something more complete.
+
+Bad Apple mode was added simply because "why not". Terminal animations are tradition.
+
+If something doesn't work on your setup - open an issue, I'll look at it.
+
+The repo contains the C++ scanner, the IDA signature plugin, read-only dumpers, and multi-language SDK generator.
 
 ## Features
 

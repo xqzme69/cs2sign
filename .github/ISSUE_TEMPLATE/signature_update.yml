@@ -1,0 +1,56 @@
+name: Signature or offset update
+description: Report a missing, stale, or newly discovered signature or offset.
+title: "[Signature]: "
+labels: ["signatures"]
+body:
+  - type: input
+    id: cs2-build
+    attributes:
+      label: CS2 build number
+      placeholder: "Example: 14158"
+    validations:
+      required: true
+  - type: input
+    id: target
+    attributes:
+      label: Signature or offset name
+      placeholder: "dwEntityList, CreateMove, SchemaSystem, ..."
+    validations:
+      required: true
+  - type: dropdown
+    id: module
+    attributes:
+      label: Module
+      options:
+        - client.dll
+        - engine2.dll
+        - schemasystem.dll
+        - inputsystem.dll
+        - soundsystem.dll
+        - server.dll
+        - networksystem.dll
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: data
+    attributes:
+      label: Pattern, offset, or evidence
+      description: Include source/provenance links when possible.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation performed
+      placeholder: "Commands run, scan result, dump output, or why this is expected to work."
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: This is for read-only scanning/dumping.
+          required: true
+        - label: This does not request injection, hooks, memory writes, or gameplay automation.
+          required: true
